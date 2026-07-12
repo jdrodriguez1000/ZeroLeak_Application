@@ -107,7 +107,7 @@ ZeroLeak es un **motor de auditoría** que consume **datos del cliente** (CSV/Ex
                         clients/<CLIENTE>/  (aislamiento en disco)
 ```
 
-**Componentes de código previstos (`src/zeroleak/`):**
+**Componentes de código previstos (`app/src/zeroleak/`):**
 - **`cli`** — fachada de línea de comandos para el DS; interpreta comandos y llama al motor. *→ Evolución: se reemplaza/complementa por una API web + frontend; el motor no cambia.*
 - **`core`** — el motor: orquestación del pipeline, `ClientContext`, contratos de entrada/salida, resolución de rutas.
 - **`ingest`** — registra los archivos que entran a **bronze** y mantiene el **manifiesto de procesamiento** (qué se procesó y qué no) (§11).
@@ -259,19 +259,21 @@ Cada cliente es un **tenant**: una carpeta autocontenida bajo `clients/<CLIENTE>
 
 ```
 ZeroLeak_Application/
-├── src/zeroleak/                  # paquete Python — el MOTOR
-│   ├── cli.py                     # fachada CLI (hoy)
-│   ├── core/                      # pipeline, ClientContext, contratos, rutas
-│   ├── ingest/                    # registro en bronze + manifiesto de procesamiento
-│   ├── vault/                     # Datos en Bóveda: Drop & Detach (bronze → silver), §7
-│   ├── modules/                   # un módulo por categoría de error (§6)
-│   │   ├── identity/  structure/  relational/  category/
-│   ├── finance/                   # traductor de errores → USD
-│   ├── report/                    # Data ROI Dashboard + CSVs masticados → gold
-│   └── llm/                       # acceso LLM (solo sintéticos, §13)
-│
-├── config/
-│   └── sectors/                   # YAML 4: Maestro de Sectores (global, propiedad de ZeroLeak)
+├── app/                           # código y activos versionables del motor
+│   ├── src/zeroleak/              # paquete Python — el MOTOR
+│   │   ├── cli.py                 # fachada CLI (hoy)
+│   │   ├── core/                  # pipeline, ClientContext, contratos, rutas
+│   │   ├── ingest/                # registro en bronze + manifiesto de procesamiento
+│   │   ├── vault/                 # Datos en Bóveda: Drop & Detach (bronze → silver), §7
+│   │   ├── modules/               # un módulo por categoría de error (§6)
+│   │   │   ├── identity/  structure/  relational/  category/
+│   │   ├── finance/               # traductor de errores → USD
+│   │   ├── report/                # Data ROI Dashboard + CSVs masticados → gold
+│   │   └── llm/                   # acceso LLM (solo sintéticos, §13)
+│   ├── config/
+│   │   └── sectors/               # YAML 4: Maestro de Sectores (global, propiedad de ZeroLeak)
+│   ├── data_synthetic/            # "matrices de mentiras" que ve el LLM (falsas, §7) [versionable]
+│   └── tests/                     # suite de pruebas (pytest)
 │
 ├── clients/                       # ← multi-tenant: un tenant (carpeta) por cliente
 │   └── SANDUCHERIA/               # === TENANT DEL CLIENTE (todo lo suyo aquí) ===
@@ -286,7 +288,6 @@ ZeroLeak_Application/
 │           ├── gold/              #   🥇 resultados: métricas, Pareto, CSVs masticados
 │           └── manifest.json      #   ledger: qué archivo se procesó y cuál no
 │
-├── data_synthetic/                # "matrices de mentiras" que ve el LLM (falsas, §7) [versionable]
 ├── 600_template/  610_features/  700_architecture/  900_persistence/   # metodología, diseño, seguimiento
 ```
 
@@ -341,7 +342,7 @@ El motor **no** navega carpetas por fecha para adivinar qué procesar. Mantiene 
 
 ## 13. Encapsulamiento del LLM
 
-- Todo acceso a LLM pasa por `src/zeroleak/llm/` detrás de una interfaz estable.
+- Todo acceso a LLM pasa por `app/src/zeroleak/llm/` detrás de una interfaz estable.
 - **El LLM NO participa del camino de datos reales.** Su rol es de **desarrollo/diseño**: ayudar a construir reglas, módulos y estructuras usando **exclusivamente datos sintéticos** (C-01, §7). El motor de auditoría en ejecución es **determinista y sin LLM**.
 - Si en el futuro se usa LLM para narrar hallazgos o proponer configuración, opera **solo sobre agregados/banderas** (nunca PII) y su salida se **valida** antes de escribir artefactos.
 - **Proveedor por defecto:** API de Anthropic (Claude), detrás de la interfaz, de modo que el proveedor/modelo sea intercambiable sin tocar el motor.

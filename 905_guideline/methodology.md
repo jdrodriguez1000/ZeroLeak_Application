@@ -85,7 +85,7 @@ en `verification.md`. Si algo no traza, el artefacto está incompleto.
 
 **Ubicación de artefactos.** Por feature en
 `610_features/<feature>/{feature_contract.md, definition.md, <feature>.ipynb, spec.md, plan.md, verification.md, state.json}`;
-el código en `src/zeroleak/…` y los tests en `tests/…`. Las plantillas viven en `600_template/`.
+el código en `app/src/zeroleak/…` y los tests en `app/tests/…`. Las plantillas viven en `600_template/`.
 
 ---
 

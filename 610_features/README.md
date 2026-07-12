@@ -18,7 +18,7 @@ en [`../600_template/`](../600_template/).
 └── state.json            # máquina de estado de la construcción (13 etapas)
 ```
 
-El **código** correspondiente vive en `src/zeroleak/…` y los **tests** en `tests/…`.
+El **código** correspondiente vive en `app/src/zeroleak/…` y los **tests** en `app/tests/…`.
 
 ## Trazabilidad
 

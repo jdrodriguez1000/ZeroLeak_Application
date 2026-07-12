@@ -9,7 +9,7 @@ en dólares perdidos y los prioriza con un Pareto financiero (80/20) accionable.
 
 Diseño completo en [`700_architecture/system_design.md`](700_architecture/system_design.md).
 
-## Estructura del motor (`src/zeroleak/`)
+## Estructura del motor (`app/src/zeroleak/`)
 
 | Paquete | Responsabilidad |
 |---|---|

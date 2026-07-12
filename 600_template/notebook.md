@@ -24,7 +24,7 @@
 
 ## Lifecycle (Opción A)
 - El notebook es **artefacto de referencia/demo ligado a `definition.md`**.
-- Al pasar a `src/`, **no se copia-pega**: la spec y el bucle TDD reescriben la lógica. La fuente de verdad
+- Al pasar a `app/src/`, **no se copia-pega**: la spec y el bucle TDD reescriben la lógica. La fuente de verdad
   del producto pasa a ser `.py` + tests; el notebook queda como documentación del spike.
 
 ## Resultado esperado del gate humano (paso 5)

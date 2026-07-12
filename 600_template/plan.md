@@ -6,8 +6,8 @@
 <Módulos, clases, funciones y cómo se organizan.>
 
 ## Archivos Afectados
-- `src/zeroleak/<...>` — <a crear/modificar>
-- `tests/<...>` — <a crear/modificar>
+- `app/src/zeroleak/<...>` — <a crear/modificar>
+- `app/tests/<...>` — <a crear/modificar>
 
 ## Tareas
 > Cada tarea lleva un **código `TSK-xx`** y es **atómica**. Reglas de partición (obligatorias):

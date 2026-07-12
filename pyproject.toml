@@ -27,8 +27,8 @@ dev = [
 zlk = "zeroleak.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/zeroleak"]
+packages = ["app/src/zeroleak"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["src"]
+testpaths = ["app/tests"]
+pythonpath = ["app/src"]

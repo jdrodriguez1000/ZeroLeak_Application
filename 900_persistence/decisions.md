@@ -20,6 +20,7 @@ Registro de las decisiones tomadas durante la ejecución del proyecto.
 - [D-12] Comando de consola `zlk` (paquete Python `zeroleak`)
 - [D-13] Tenants de cliente generados dinámicamente con `zlk client new`, nunca a mano ni commiteados
 - [D-14] Convención de carpeta de features: `610_features/` (no `600_features/`)
+- [D-15] Refactor estructural: código movido a `app/` (`config/`, `data_synthetic/`, `src/`, `tests/`); `clients/` permanece en la raíz
 
 ---
 
@@ -93,3 +94,8 @@ Registro de las decisiones tomadas durante la ejecución del proyecto.
 - **Contexto:** Se necesitaba una carpeta para alojar los features construidos (uno por carpeta, artefactos directos por D-01 sin bandas), y `600_features` colisionaba en numeración con `600_template/` ya existente.
 - **Decisión:** Se adopta **`610_features/`** como carpeta de features construidos; `600_template/` sigue siendo la carpeta de plantillas.
 - **Consecuencias:** Se corrigieron todas las referencias rezagadas a `600_features` en `905_guideline/methodology.md`, `900_persistence/tasks.md` y `700_architecture/system_design.md`; se creó `610_features/README.md` como índice del folder.
+
+## [2026-07-12] D-15 — Refactor estructural: código movido a `app/`; `clients/` permanece en la raíz
+- **Contexto:** El repo tenía `config/`, `data_synthetic/`, `src/` y `tests/` sueltos en la raíz, mezclados con las carpetas de andamiaje SDD+TDD (`900_persistence`, `700_architecture`, etc.) y con `clients/` (data de runtime del tenant). Se buscaba una separación más clara entre "código del motor" y "andamiaje del proyecto/runtime".
+- **Decisión:** Mover con `git mv` las carpetas `config/`, `data_synthetic/`, `src/` y `tests/` a `app/config/`, `app/data_synthetic/`, `app/src/` y `app/tests/`. La carpeta `clients/` **no** se mueve: permanece en la raíz del repo, hermana de `app/`, porque es data de runtime del tenant (no código empaquetado) y sigue bajo la regla `.gitignore clients/*/data/` de C-01. El core de scaffold (`create_client`) siempre recibe `clients_root` como parámetro explícito, en vez de asumir una ruta fija relativa a `app/`.
+- **Consecuencias:** Actualizadas todas las referencias del repo: `pyproject.toml` (`packages = ["app/src/zeroleak"]`, `testpaths = ["app/tests"]`, `pythonpath = ["app/src"]`), los 9 agentes de desarrollo en `.claude/agents/`, templates (`600_template/plan.md`, `notebook.md`), `README.md`, `610_features/README.md`, `905_guideline/methodology.md` y el árbol + prosa de `700_architecture/system_design.md`. Verificado: `import zeroleak` funciona y `pytest` resuelve `testpaths: app/tests`. Toda mención futura a rutas de código debe usar el prefijo `app/`, mientras que las rutas de tenants siguen siendo `clients/<CLIENTE>/...` sin ese prefijo.

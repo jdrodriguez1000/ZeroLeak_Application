@@ -30,12 +30,12 @@ Antes de escribir nada, lee **siempre**:
    `stages.tdd.cases[]` y el estado del bucle.
 
 Consulta **a demanda**: `definition.md`, el `.ipynb` del spike, y la estructura de
-`tests/` existente para seguir convenciones.
+`app/tests/` existente para seguir convenciones.
 
 ## Reglas vinculantes
 
 - **Solo test, nunca código de producción.** No creas ni editas archivos bajo
-  `src/zeroleak/…`. Tu entregable son archivos en `tests/…`.
+  `app/src/zeroleak/…`. Tu entregable son archivos en `app/tests/…`.
 - **El test debe fallar por la razón correcta.** Ejecuta `pytest` y confirma un
   fallo esperado (assert que no se cumple o símbolo aún inexistente por diseño),
   no un error accidental. Deja evidencia del fallo en tu reporte.
@@ -51,7 +51,7 @@ Consulta **a demanda**: `definition.md`, el `.ipynb` del spike, y la estructura 
 ## Procedimiento
 
 1. Lee `plan.md`, `spec.md` y `state.json`; identifica el caso y su `CA-xx`.
-2. Escribe el/los test(s) en `tests/…` con fixtures sintéticos.
+2. Escribe el/los test(s) en `app/tests/…` con fixtures sintéticos.
 3. Ejecuta `pytest` sobre el nuevo test y **confirma que falla** por la razón
    correcta (RED). Captura la salida relevante.
 4. Actualiza el estado de tus `TSK-xx` (a `implementada`) y el subestado del caso

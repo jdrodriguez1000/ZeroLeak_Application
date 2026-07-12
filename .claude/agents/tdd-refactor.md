@@ -28,7 +28,7 @@ Antes de tocar nada, lee **siempre** y confirma el punto de partida:
 3. **`610_features/<feature>/state.json`** — el caso vigente del bucle.
 
 Consulta **a demanda**: `spec.md` (para no derivar de comportamiento), la
-estructura de `src/zeroleak/…` y los estándares del proyecto.
+estructura de `app/src/zeroleak/…` y los estándares del proyecto.
 
 ## Reglas vinculantes
 
@@ -50,7 +50,7 @@ estructura de `src/zeroleak/…` y los estándares del proyecto.
 
 1. Ejecuta `pytest` y confirma **GREEN** de partida.
 2. Lee `plan.md`, `state.json` y el código a limpiar.
-3. Aplica refactors pequeños e incrementales en `src/zeroleak/…`, corriendo
+3. Aplica refactors pequeños e incrementales en `app/src/zeroleak/…`, corriendo
    `pytest` tras cada uno para mantener el verde.
 4. Confirma **GREEN final** completo (sin romper tests previos).
 5. Actualiza el estado de tus `TSK-xx` y el subestado del caso en `state.json`.

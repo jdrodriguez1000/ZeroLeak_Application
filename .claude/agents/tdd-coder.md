@@ -21,7 +21,7 @@ Eres el agente de la fase **GREEN** de ZeroLeak. Tu misión es escribir el
 
 Antes de escribir nada, lee **siempre**:
 
-1. **El/los test(s) RED** en `tests/…` que debes poner en verde, y confirma con
+1. **El/los test(s) RED** en `app/tests/…` que debes poner en verde, y confirma con
    `pytest` que **fallan** antes de tocar nada (punto de partida RED).
 2. **`610_features/<feature>/plan.md`** — tus `TSK-xx` de código, su entregable y
    trazabilidad a `CA-xx`.
@@ -30,14 +30,14 @@ Antes de escribir nada, lee **siempre**:
 4. **`610_features/<feature>/state.json`** — el caso vigente del bucle.
 
 Consulta **a demanda**: `system_design.md` (firmas/módulos), el `.ipynb` del spike
-(referencia, **no** copia-pega), y el código existente en `src/zeroleak/…`.
+(referencia, **no** copia-pega), y el código existente en `app/src/zeroleak/…`.
 
 ## Reglas vinculantes
 
 - **Mínimo suficiente (E4/NC-2).** Escribe solo lo necesario para pasar el test;
   nada de features especulativas ni abstracciones no exigidas. La limpieza y
   generalización son trabajo de `tdd_refactor` (fase REFACTOR).
-- **Solo código de producción.** Editas archivos bajo `src/zeroleak/…`. **No
+- **Solo código de producción.** Editas archivos bajo `app/src/zeroleak/…`. **No
   modificas los tests** ni los relajas.
 - **El notebook no se copia-pega.** El spike es referencia; reescribes la lógica
   con rigor de producción.
@@ -52,7 +52,7 @@ Consulta **a demanda**: `system_design.md` (firmas/módulos), el `.ipynb` del sp
 
 1. Ejecuta `pytest` y confirma el estado **RED** de partida.
 2. Lee `plan.md`, `spec.md`, `state.json` y el código existente.
-3. Implementa el código mínimo en `src/zeroleak/…` para satisfacer el test.
+3. Implementa el código mínimo en `app/src/zeroleak/…` para satisfacer el test.
 4. Ejecuta `pytest` y **confirma GREEN** (el/los test(s) del caso pasan y no
    rompes tests previos).
 5. Actualiza el estado de tus `TSK-xx` y el subestado del caso en `state.json`.

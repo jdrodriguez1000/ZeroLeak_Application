@@ -49,8 +49,8 @@ Consulta **a demanda**:
   `CA-xx`.
 - **Casos de test ordenados** de simple a complejo; deben **coincidir con
   `stages.tdd.cases[]`** del `state.json`.
-- **Archivos reales.** El plan nombra archivos concretos bajo `src/zeroleak/…` y
-  `tests/…`, coherentes con la estructura del proyecto.
+- **Archivos reales.** El plan nombra archivos concretos bajo `app/src/zeroleak/…` y
+  `app/tests/…`, coherentes con la estructura del proyecto.
 - **Datos en Bóveda.** Fixtures y datos de prueba son **sintéticos**; nunca datos
   reales del cliente.
 - **No cruces gates.** Al terminar, el humano aprueba/rechaza el plan (gate del

@@ -29,8 +29,8 @@ Antes de escribir nada, lee **siempre**:
 3. **`610_features/<feature>/state.json`** — que el bucle TDD esté **cerrado**
    (casos en verde) antes de integrar.
 
-Consulta **a demanda**: el código en `src/zeroleak/…`, los tests unitarios
-existentes en `tests/…` y `system_design.md` para los contratos entre piezas.
+Consulta **a demanda**: el código en `app/src/zeroleak/…`, los tests unitarios
+existentes en `app/tests/…` y `system_design.md` para los contratos entre piezas.
 
 ## Reglas vinculantes
 
@@ -40,8 +40,8 @@ existentes en `tests/…` y `system_design.md` para los contratos entre piezas.
 - **Fixtures sintéticos (Datos en Bóveda).** Toda entrada de prueba es sintética;
   nunca datos reales del cliente. El aislamiento por tenant (`clients/<CLIENTE>/data/`,
   C-01) no se viola ni se lee.
-- **No arreglas producción.** Editas **solo** archivos de test en `tests/…`. Un
-  fallo end-to-end se **reporta**; no modificas `src/zeroleak/…`.
+- **No arreglas producción.** Editas **solo** archivos de test en `app/tests/…`. Un
+  fallo end-to-end se **reporta**; no modificas `app/src/zeroleak/…`.
 - **Independencia real.** No reutilices supuestos del coder; deriva los asertos
   desde la **spec**, no desde la implementación.
 - **Single Writer Rule.** Actualizas **solo el estado de tus propias tareas** de
@@ -51,7 +51,7 @@ existentes en `tests/…` y `system_design.md` para los contratos entre piezas.
 
 1. Confirma con `state.json` que el bucle TDD está cerrado (casos en verde).
 2. Lee `spec.md` y `plan.md`; identifica los flujos end-to-end y `CA-xx` a ejercer.
-3. Escribe la suite de integración en `tests/…` con fixtures sintéticos.
+3. Escribe la suite de integración en `app/tests/…` con fixtures sintéticos.
 4. Ejecuta `pytest` sobre toda la suite (unit + integración) y captura resultados.
 5. Si todo pasa, marca tus tareas; si hay fallo end-to-end, **repórtalo** sin
    tocar producción y actualiza el estado según corresponda.

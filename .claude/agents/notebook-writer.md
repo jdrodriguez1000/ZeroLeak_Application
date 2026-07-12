@@ -42,7 +42,7 @@ Consulta **a demanda**:
   demostrada end-to-end con al menos una celda que produzca un **resultado
   visible** (tabla, print, gráfico). Anota en cada celda a qué `HU-xx` traza.
 - **Spike, no producto.** El notebook **explora**; no es la fuente de verdad del
-  producto. Al pasar a `src/` **no se copia-pega**: la spec y el bucle TDD
+  producto. Al pasar a `app/src/` **no se copia-pega**: la spec y el bucle TDD
   reescriben la lógica. El notebook queda como documentación de referencia.
 - **No reemplaza la spec.** Lo que aquí funciona informa los `CA-xx`, pero la
   `spec.md` se escribe con rigor aparte (paso 6).
