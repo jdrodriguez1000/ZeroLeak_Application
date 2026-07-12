@@ -1,7 +1,7 @@
 ---
 name: session-closer
 description: Ejecuta el "protocolo de cierre de sesión". Registra en los archivos de persistencia (carpeta 900_persistence) todo lo realizado o trabajado durante la sesión. Invocar cuando el humano quiera cerrar/terminar/guardar la sesión o el trabajo — frases como "cerremos la sesión", "terminemos por hoy", "guardemos el avance", "cierre de sesión", "finalicemos el trabajo".
-tools: Read, Edit, Write, Glob, Grep
+tools: Read, Edit, Write, Glob, Grep, Bash
 model: sonnet
 color: green
 ---

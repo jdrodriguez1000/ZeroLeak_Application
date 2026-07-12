@@ -1,0 +1,17 @@
+{
+  "feature": "<feature>",
+  "status": "pending",
+  "current_stage": "feature_contract",
+  "stages": {
+    "feature_contract":   { "status": "pending", "artifact": "feature_contract.md", "owner": "main_session" },
+    "feature_definer":    { "status": "pending", "artifact": "definition.md" },
+    "notebook_writer":    { "status": "pending", "artifact": "<feature>.ipynb", "gate": "human", "awaiting_approval": false },
+    "spec_writer":        { "status": "pending", "artifact": "spec.md",  "gate": "human", "awaiting_approval": false },
+    "plan_builder":       { "status": "pending", "artifact": "plan.md",  "gate": "human", "awaiting_approval": false },
+    "tdd":                { "status": "pending", "cases": [] },
+    "integration_tester": { "status": "pending" },
+    "spec_verifier":      { "status": "pending", "artifact": "verification.md" },
+    "human_test":         { "status": "pending", "gate": "human" },
+    "merge_to_main":      { "status": "pending", "gate": "human" }
+  }
+}

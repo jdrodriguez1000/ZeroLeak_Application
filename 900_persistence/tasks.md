@@ -11,7 +11,8 @@ Registro de las tareas realizadas y por realizar del proyecto.
 
 ## Índice
 <!-- Mantener actualizado. Resumen de tareas por ID y estado. -->
-_(sin tareas todavía)_
+- T-01…T-09 → **Implementada** (bootstrap metodológico)
+- T-10…T-13 → **No implementada** (agentes de desarrollo, estructura de código, primer feature)
 
 ---
 
@@ -19,4 +20,16 @@ _(sin tareas todavía)_
 
 | ID | Tarea | Estado | Fecha | Notas |
 |----|-------|--------|-------|-------|
-| | | | | |
+| T-01 | Crear `900_persistence` con los 6 archivos (con índice) | Implementada | 2026-07-12 | |
+| T-02 | Crear subagentes `session-starter` y `session-closer` | Implementada | 2026-07-12 | haiku/azul y sonnet/verde |
+| T-03 | Crear `CLAUDE.md` con protocolos de inicio/cierre | Implementada | 2026-07-12 | |
+| T-04 | Enlazar Git + GitHub (`.gitignore`, `.gitattributes`) | Implementada | 2026-07-12 | rama main, commits subidos |
+| T-05 | Dejar `principles.md` agnóstico (sin FODA) | Implementada | 2026-07-12 | |
+| T-06 | Analizar `Salud de datos.docx` | Implementada | 2026-07-12 | |
+| T-07 | Definir flujo de 13 pasos (Opción A, sin bandas) | Implementada | 2026-07-12 | |
+| T-08 | Alinear templates de `600_template/` (+`notebook.md`) | Implementada | 2026-07-12 | trazabilidad HU→CA→TSK→matriz |
+| T-09 | Reescribir `methodology.md` para ZeroLeak | Implementada | 2026-07-12 | incl. "Datos en Bóveda" |
+| T-10 | Crear los 9 agentes de desarrollo | No implementada | 2026-07-12 | feature_definer … spec_verifier |
+| T-11 | Crear estructura `src/zeroleak/`, `tests/`, `data_real/`, `600_features/` | No implementada | 2026-07-12 | `data_real/` en `.gitignore` |
+| T-12 | Definir el primer feature (Tracer Bullet) | No implementada | 2026-07-12 | |
+| T-13 | Verificar registro de subagentes tras reiniciar Claude Code | No implementada | 2026-07-12 | el harness no los tomó esta sesión |
