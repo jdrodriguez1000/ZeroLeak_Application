@@ -186,6 +186,7 @@ procesa la información:
   humano `human_test` (el humano prueba la feature) y `merge_to_main` (el humano mergea el PR).
   **La automatización llega hasta el PR; el harness nunca mergea a `main` por su cuenta.**
 - **Selección de modelos:** el modelo adecuado según la tarea — **Opus** para definición/spec/plan/verificación
-  (`feature_definer`, `spec_writer`, `plan_builder`, `spec_verifier`), **Sonnet** para ejecución
-  (`notebook_writer`, `tdd_coder`, `tdd_refactor`, `integration_tester`, `tdd_tester`), **Haiku** para
-  tareas ligeras (p. ej. `session-starter`).
+  (`spec_writer`, `plan_builder`, `spec_verifier`) y para `notebook_writer` (excepción explícita),
+  **Sonnet** para ejecución (`tdd_coder`, `tdd_refactor`, `integration_tester`, `tdd_tester`) y para
+  `feature_definer` (excepción explícita), **Haiku** para tareas ligeras (p. ej. `session-starter`).
+  Ver D-05 revisado para las excepciones.

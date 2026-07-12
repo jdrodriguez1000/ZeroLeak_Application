@@ -47,6 +47,7 @@ Registro de las decisiones tomadas durante la ejecución del proyecto.
 - **Contexto:** Escalamiento proporcional a la complejidad (P6).
 - **Decisión:** **Opus** para definición/spec/plan/verificación; **Sonnet** para ejecución (notebook, coder, refactor, integration, tester); **Haiku** para tareas ligeras (session-starter).
 - **Consecuencias:** Documentado en el apéndice de `methodology.md`.
+- **[Revisión 2026-07-12]** `feature_definer` se implementa con **Sonnet** (no Opus) y `notebook_writer` con **Opus** (no Sonnet), por decisión del humano al crear cada agente. El apéndice de `methodology.md` queda alineado. Las reglas generales (Opus para definición, Sonnet para ejecución) se mantienen como guía; estas dos son excepciones explícitas vigentes.
 
 ## [2026-07-12] D-06 — Alcance del diseño: motor local con mapa de costuras a SaaS
 - **Contexto:** Al diseñar `system_design.md` había que decidir si documentar una plataforma SaaS completa o solo el script local de la Fase Servicio.

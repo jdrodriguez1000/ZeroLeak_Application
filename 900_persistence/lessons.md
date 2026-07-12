@@ -9,6 +9,7 @@ Registro de las lecciones aprendidas durante la ejecución del proyecto.
 - [L-01] Los subagentes `.claude/agents/*.md` requieren reiniciar Claude Code para ser invocables.
 - [L-02] Extracción de `.docx` sin `python-docx` y encoding en consola Windows.
 - [L-03] Carpetas de andamiaje pueden arrastrar artefactos de un proyecto hermano (FODA).
+- [L-04] Colores de agentes repetidos entre subagentes (decisión consciente, pendiente de revisión).
 
 ---
 
@@ -26,3 +27,8 @@ Registro de las lecciones aprendidas durante la ejecución del proyecto.
 - **Situación:** `700_architecture/system_design.md` y `sdd_tdd_workflow.md` resultaron pertenecer al proyecto hermano **FODA** (Foda_Application), no a ZeroLeak; estaban sin trackear en git, probablemente copiados al iniciar el andamiaje del repo.
 - **Lección:** Antes de dar por válido el contenido de una carpeta recién creada por andamiaje, **verificar que el contenido corresponda al proyecto actual** (nombres, dominio, referencias cruzadas), especialmente si existe un proyecto hermano con estructura similar.
 - **Acción futura:** Al iniciar/retomar sesión, revisar carpetas de diseño (`700_architecture/`, etc.) en busca de referencias a otros proyectos antes de asumir que su contenido es correcto.
+
+## [2026-07-12] L-04 — Colores repetidos entre subagentes
+- **Situación:** Al crear los 9 agentes de desarrollo (T-10), algunos colores quedaron repetidos: `green` en `feature-definer` y `tdd-coder`; `cyan` en `notebook-writer` e `integration-tester`; `blue` compartido entre `tdd-refactor` y `session-starter`.
+- **Lección:** Fue una decisión consciente del humano al momento de crear cada agente (no un error), pero puede dificultar distinguir agentes por color en la interfaz si se ejecutan en paralelo.
+- **Acción futura:** Evaluar si conviene unificar/diferenciar los colores en una sesión futura, sin que sea bloqueante para el avance del proyecto.
