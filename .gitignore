@@ -17,3 +17,18 @@ temp/
 .env
 .env.*
 !.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# C-01 "Datos en Bóveda" (inviolable): los datos REALES del cliente nunca
+# entran a git ni al indexador de la IA. Solo se versiona client.yaml e input/.
+# Los datos viven en clients/<CLIENTE>/data/ (capas medallion), siempre ignorados.
+clients/*/data/

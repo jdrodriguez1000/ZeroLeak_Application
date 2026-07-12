@@ -84,7 +84,7 @@ Toda `HU-xx` debe estar cubierta por ≥1 `CA-xx`; todo `CA-xx` por ≥1 `TSK-xx
 en `verification.md`. Si algo no traza, el artefacto está incompleto.
 
 **Ubicación de artefactos.** Por feature en
-`600_features/<feature>/{feature_contract.md, definition.md, <feature>.ipynb, spec.md, plan.md, verification.md, state.json}`;
+`610_features/<feature>/{feature_contract.md, definition.md, <feature>.ipynb, spec.md, plan.md, verification.md, state.json}`;
 el código en `src/zeroleak/…` y los tests en `tests/…`. Las plantillas viven en `600_template/`.
 
 ---
@@ -105,7 +105,7 @@ el trabajo entre sesiones y ante fallos (E1, E5).
 | Capa | Dónde | Qué guarda |
 |---|---|---|
 | Proyecto / sesión | `900_persistence/` | `progress` · `tasks` · `lessons` · `decisions` · `assumptions` · `constraints` |
-| Por feature (SDD/TDD) | `600_features/<feature>/state.json` | máquina de estado de la construcción (13 etapas) |
+| Por feature (SDD/TDD) | `610_features/<feature>/state.json` | máquina de estado de la construcción (13 etapas) |
 
 ### 3.2 Single Writer Rule
 Cada archivo de estado tiene **un único responsable de escritura**, para evitar condiciones de carrera.

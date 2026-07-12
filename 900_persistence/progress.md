@@ -9,18 +9,21 @@ Consultándolo siempre sabemos el estado y avance actual del proyecto.
 <!-- Mantener actualizado. Un enlace por entrada registrada. -->
 - [2026-07-12] Bootstrap del proyecto: persistencia, agentes de sesión, Git/GitHub, metodología y templates SDD+TDD.
 - [2026-07-12] Diseño de arquitectura: `700_architecture/system_design.md` v0.2 de ZeroLeak (limpieza de artefactos de FODA, esquema Medallion por tenant, Data Health Score dual, mapa de costuras a SaaS).
+- [2026-07-12] T-11 completada: esqueleto del motor (`pyproject.toml`, `src/zeroleak/` con 9 submódulos, `.gitignore` C-01, verificación de aislamiento de datos de cliente) y convención `610_features/` alineada en todo el repo.
 
 ---
 
 ## Estado actual
-El proyecto **ZeroLeak** avanzó de andamiaje metodológico a **diseño de arquitectura (v0.2)**.
+El proyecto **ZeroLeak** avanzó de diseño de arquitectura a **esqueleto de código del motor**.
 Ya está definida la metodología de desarrollo (Notebook → SDD+TDD, Opción A sin bandas), los templates
-de artefactos de feature, los protocolos de sesión, el enlace a GitHub, y ahora también el **diseño de
-arquitectura del motor** (`700_architecture/system_design.md`): script Python local con capas Medallion
-(bronze/silver/gold) por tenant de cliente, manifiesto de procesamiento idempotente, Data Health Score
-dual (financiero/operativo) y un mapa de costuras explícito para evolucionar de Servicio local a SaaS sin
-reescribir el núcleo. Falta alinear la estructura de carpetas de código (T-11) a este diseño, crear los
-agentes de desarrollo y arrancar el primer feature (Tracer Bullet).
+de artefactos de feature, los protocolos de sesión, el enlace a GitHub, el **diseño de arquitectura del
+motor** (`700_architecture/system_design.md` v0.2), y ahora el **esqueleto de código Python**
+(`pyproject.toml` con comando `zlk`, paquete `zeroleak` en `src/` con submódulos `core/ingest/vault/
+modules/finance/report/llm`) con el aislamiento C-01 verificado vía `.gitignore` sobre `clients/*/data/`.
+Se adoptó la convención `610_features/` (en vez de `600_features/`) y se decidió que los tenants de
+cliente se generarán dinámicamente con el comando `zlk client new` (patrón heredado de FODA), en vez de
+crearse a mano o commitearse. El tenant de demostración se llamará `COMPANY_DEMO`. Falta crear los 9
+agentes de desarrollo (T-10) y luego construir el primer Tracer Bullet: `zlk client new` (T-12).
 
 ## Lo realizado
 - **[2026-07-12]** Creada carpeta `900_persistence` con los 6 archivos de persistencia (con índice cada uno).
@@ -36,9 +39,11 @@ agentes de desarrollo y arrancar el primer feature (Tracer Bullet).
 - **[2026-07-12]** Releído el documento fuente `980_documents/Salud de datos.docx` para aterrizar el dominio de ZeroLeak (4 categorías de error, modelo de 4 YAMLs, traducción financiera, Data Health Score, Data ROI Dashboard).
 - **[2026-07-12]** Creado `700_architecture/system_design.md` v0.2 propio de ZeroLeak (16 secciones): principio rector Servicio→SaaS, dominio, esquema de datos Medallion por tenant, manifiesto de procesamiento, RBAC futuro, alcance MVP (Retail Moderno, caso guía sanduchería).
 - **[2026-07-12]** Acordadas con el humano las decisiones de diseño de la arquitectura (ver `decisions.md` D-06…D-11): alcance motor-local-con-mapa-a-SaaS, Data Health Score dual, caso guía sanduchería, esquema Medallion por tenant, manifiesto de procesamiento, rename `config/`→`input/`.
+- **[2026-07-12]** **T-11 completada:** creado `pyproject.toml` (paquete `zeroleak`, comando de consola `zlk`, Python 3.13+, hatchling, src-layout, pytest configurado); creado `src/zeroleak/` con `__init__.py`, `cli.py` (placeholder) y submódulos `core/ingest/vault/modules/{identity,structure,relational,category}/finance/report/llm` con docstrings referenciando su sección de `system_design.md`; creados `.gitkeep` en `config/sectors/`, `data_synthetic/`, `tests/`; creado `README.md` del proyecto; `.gitignore` ampliado con sección Python y la regla C-01 `clients/*/data/`. Verificado: import OK de los 9 submódulos y `git check-ignore` confirma el aislamiento de datos de cliente (C-01 blindado); no quedaron tenants commiteados.
+- **[2026-07-12]** Adoptada la convención `610_features/` (en vez de `600_features/`, para no colisionar con `600_template/`); creado `610_features/README.md` y corregidas todas las referencias rezagadas a `600_features` en `methodology.md`, `tasks.md` y `system_design.md`.
+- **[2026-07-12]** Decidido con el humano (ver `decisions.md` D-12…D-14): el comando de consola es `zlk` (paquete `zeroleak`); los tenants de cliente se generan dinámicamente con `zlk client new` (core `create_client()` en `src/zeroleak/core/scaffold.py`, patrón heredado de FODA) y no se commitean ni crean a mano; el tenant de demostración se llama `COMPANY_DEMO`.
 
 ## Lo próximo a realizar
-- Actualizar **T-11** (estructura de carpetas) para alinearla al `system_design.md` v0.2: `src/zeroleak/` con submódulos `core/ingest/vault/modules/finance/report/llm`; `clients/<CLIENTE>/input/` + `clients/<CLIENTE>/data/{bronze,silver,gold}/`; `config/sectors/`; `data_synthetic/`; regla `.gitignore` para `clients/*/data/`.
-- Crear los **9 agentes de desarrollo**: `feature_definer`, `notebook_writer`, `spec_writer`, `plan_builder`, `tdd_tester`, `tdd_coder`, `tdd_refactor`, `integration_tester`, `spec_verifier`.
-- Definir el **primer feature** (Tracer Bullet a nivel de proyecto), ya informado por `system_design.md` v0.2.
-- (Menor) Verificar que los agentes `.claude/agents/*.md` se registren como subagentes tras reiniciar Claude Code.
+- **Prioridad inmediata:** crear los **9 agentes de desarrollo (T-10)**: `feature_definer`, `notebook_writer`, `spec_writer`, `plan_builder`, `tdd_tester`, `tdd_coder`, `tdd_refactor`, `integration_tester`, `spec_verifier`.
+- Construir el **primer Tracer Bullet (T-12)**: `zlk client new <NOMBRE_CLIENTE>`, respaldado por `create_client(name, clients_root)` en `src/zeroleak/core/scaffold.py`; usar `COMPANY_DEMO` como tenant de demostración con datos sintéticos.
+- (Menor) Verificar que los agentes `.claude/agents/*.md` se registren como subagentes tras reiniciar Claude Code (T-13).

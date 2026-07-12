@@ -287,7 +287,7 @@ ZeroLeak_Application/
 │           └── manifest.json      #   ledger: qué archivo se procesó y cuál no
 │
 ├── data_synthetic/                # "matrices de mentiras" que ve el LLM (falsas, §7) [versionable]
-├── 600_features/  700_architecture/  900_persistence/   # metodología, diseño, seguimiento
+├── 600_template/  610_features/  700_architecture/  900_persistence/   # metodología, diseño, seguimiento
 ```
 
 **Capas Medallion (adaptadas a ZeroLeak).** ZeroLeak **no limpia** (C-02), por lo que "silver" **no** significa "datos limpios": significa el dato **seguro** para calcular.

@@ -17,6 +17,9 @@ Registro de las decisiones tomadas durante la ejecución del proyecto.
 - [D-09] Esquema de datos del cliente en capas Medallion (bronze/silver/gold) por tenant
 - [D-10] Manifiesto de procesamiento (`manifest.json`) con hash de contenido, idempotente
 - [D-11] Rename `config/` → `input/`; aislamiento de C-01 vía `.gitignore` sobre `clients/*/data/`
+- [D-12] Comando de consola `zlk` (paquete Python `zeroleak`)
+- [D-13] Tenants de cliente generados dinámicamente con `zlk client new`, nunca a mano ni commiteados
+- [D-14] Convención de carpeta de features: `610_features/` (no `600_features/`)
 
 ---
 
@@ -74,3 +77,18 @@ Registro de las decisiones tomadas durante la ejecución del proyecto.
 - **Contexto:** Definir cómo el cliente entrega sus insumos de configuración y cómo se aísla la PII real de git/indexador (C-01).
 - **Decisión:** La carpeta de configuración por cliente pasa de `config/` a **`input/`**. El aislamiento de C-01 se logra con `.gitignore` sobre **`clients/*/data/`**, en vez de un `data_real/` global.
 - **Consecuencias:** T-11 debe crear la regla `.gitignore` correspondiente; toda referencia previa a `data_real/` en `progress.md`/`tasks.md` queda superada por esta convención basada en tenant.
+
+## [2026-07-12] D-12 — Comando de consola `zlk`
+- **Contexto:** Al construir el esqueleto del motor (T-11) había que fijar el nombre del comando de consola que expone el paquete `zeroleak`.
+- **Decisión:** El comando de consola es **`zlk`** (entry point `zlk = "zeroleak.cli:main"` en `pyproject.toml`); el paquete Python instalable sigue llamándose `zeroleak`. Uso típico: `zlk client new <NOMBRE_CLIENTE>`.
+- **Consecuencias:** Toda referencia futura al CLI en docs/agentes debe usar `zlk`, no `zeroleak`.
+
+## [2026-07-12] D-13 — Tenants de cliente generados dinámicamente, nunca a mano ni commiteados
+- **Contexto:** Había que decidir cómo nacen las carpetas `clients/<CLIENTE>/` (bronze/silver/gold, input, manifest.json).
+- **Decisión:** Los tenants **no se crean a mano ni se commitean**; se generan con el comando `zlk client new`, respaldado por un core `create_client(name, clients_root)` en `src/zeroleak/core/scaffold.py` (patrón heredado del proyecto hermano FODA, donde `client_scaffold` fue el primer feature fundacional). El tenant de demostración se llamará **`COMPANY_DEMO`** (no "SANDUCHERIA"), y operará sobre datos sintéticos. Este será el primer Tracer Bullet (T-12).
+- **Consecuencias:** Ningún tenant debe versionarse en git; `.gitignore` sobre `clients/*/data/` (D-11) protege los datos, pero la carpeta del tenant en sí solo debe existir en el filesystem local tras ejecutar el comando.
+
+## [2026-07-12] D-14 — Convención de carpeta de features: `610_features/`
+- **Contexto:** Se necesitaba una carpeta para alojar los features construidos (uno por carpeta, artefactos directos por D-01 sin bandas), y `600_features` colisionaba en numeración con `600_template/` ya existente.
+- **Decisión:** Se adopta **`610_features/`** como carpeta de features construidos; `600_template/` sigue siendo la carpeta de plantillas.
+- **Consecuencias:** Se corrigieron todas las referencias rezagadas a `600_features` en `905_guideline/methodology.md`, `900_persistence/tasks.md` y `700_architecture/system_design.md`; se creó `610_features/README.md` como índice del folder.
