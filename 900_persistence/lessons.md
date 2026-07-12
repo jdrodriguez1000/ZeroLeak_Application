@@ -11,6 +11,7 @@ Registro de las lecciones aprendidas durante la ejecución del proyecto.
 - [L-03] Carpetas de andamiaje pueden arrastrar artefactos de un proyecto hermano (FODA).
 - [L-04] Colores de agentes repetidos entre subagentes (decisión consciente, pendiente de revisión).
 - [L-05] Reemplazos masivos con `sed` pueden generar prefijos duplicados si el patrón ya existe parcialmente.
+- [L-06] Comparar `state.json` con el proyecto hermano FODA ayuda a detectar diferencias de esquema (campo `band`) antes de instanciar el primer feature.
 
 ---
 
@@ -38,3 +39,8 @@ Registro de las lecciones aprendidas durante la ejecución del proyecto.
 - **Situación:** Durante el refactor a `app/` (T-20), un reemplazo masivo con `sed` sobre referencias a `tests/` produjo un bug de doble prefijo `app/app/tests/` en 10 lugares (agentes tdd-*, integration-tester, plan-builder, template `plan.md`, `methodology.md`, `610_features/README.md`), porque el patrón `tests/` ya aparecía parcialmente prefijado por `app/` en algunas líneas procesadas antes.
 - **Lección:** Al hacer reemplazos masivos de rutas con `sed` (o similares) en múltiples archivos, verificar con un `grep` posterior que no queden patrones duplicados/anidados, especialmente cuando el reemplazo se aplica más de una vez sobre el mismo conjunto de archivos o cuando el patrón de búsqueda es un substring de la cadena de reemplazo.
 - **Acción futura:** Preferir reemplazos con anclas más específicas (p. ej. inicio de línea o comillas) y siempre correr un `grep` de verificación tras un refactor de rutas masivo antes de dar por cerrada la tarea.
+
+## [2026-07-12] L-06 — Comparar `state.json` con el proyecto hermano FODA antes de instanciar el primero
+- **Situación:** El humano preguntó por el formato correcto de `state.json` para el primer feature (`client_scaffold`). Se comparó el `state.json` de un feature ya construido en el proyecto hermano FODA (que incluye campo `band` y se organiza por bandas) contra la plantilla vigente `600_template/state.json`.
+- **Lección:** El proyecto hermano FODA es una referencia útil de patrón, pero **no debe copiarse literalmente**: ZeroLeak adoptó D-01 (Opción A, sin bandas), por lo que su `state.json` **no lleva campo `band`** y en cambio incluye etapas propias del flujo de 13 pasos ausentes en FODA (`feature_contract` con owner `main_session`, `notebook_writer`, `human_test`, `merge_to_main`), conservando la granularidad de evidencia TDD (`red_evidence`, `green_evidence`, `refactor_note`, `cases[]`).
+- **Acción futura:** Al instanciar el `state.json` de cada nuevo feature, usar siempre `600_template/state.json` como fuente de verdad (no el de FODA), y verificar que las decisiones D-01…D-05 sigan reflejadas correctamente.
