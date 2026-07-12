@@ -11,6 +11,12 @@ Registro de las decisiones tomadas durante la ejecución del proyecto.
 - [D-03] Vocabulario y set de agentes de desarrollo
 - [D-04] PR escrito por el agente, merge por el humano
 - [D-05] Selección de modelos por agente
+- [D-06] Alcance del diseño: motor local con mapa de costuras a SaaS (no plataforma SaaS completa ahora)
+- [D-07] Data Health Score: soportar ambos métodos (Financiero y Operativo), seleccionables
+- [D-08] Caso guía: sanduchería, manteniendo el motor agnóstico de sector
+- [D-09] Esquema de datos del cliente en capas Medallion (bronze/silver/gold) por tenant
+- [D-10] Manifiesto de procesamiento (`manifest.json`) con hash de contenido, idempotente
+- [D-11] Rename `config/` → `input/`; aislamiento de C-01 vía `.gitignore` sobre `clients/*/data/`
 
 ---
 
@@ -38,3 +44,33 @@ Registro de las decisiones tomadas durante la ejecución del proyecto.
 - **Contexto:** Escalamiento proporcional a la complejidad (P6).
 - **Decisión:** **Opus** para definición/spec/plan/verificación; **Sonnet** para ejecución (notebook, coder, refactor, integration, tester); **Haiku** para tareas ligeras (session-starter).
 - **Consecuencias:** Documentado en el apéndice de `methodology.md`.
+
+## [2026-07-12] D-06 — Alcance del diseño: motor local con mapa de costuras a SaaS
+- **Contexto:** Al diseñar `system_design.md` había que decidir si documentar una plataforma SaaS completa o solo el script local de la Fase Servicio.
+- **Decisión:** ZeroLeak nace como **script Python local** (Fase Servicio, "Datos en Bóveda"), pero el diseño documenta explícitamente el **mapa de costuras** para evolucionar a SaaSw y luego a SaaS (motor diseñado "como una API"; CLI es la primera fachada) sin reescribir el núcleo.
+- **Consecuencias:** `system_design.md` v0.2 incluye principio rector Servicio→SaaS y RBAC de 6 roles como diseño futuro (no implementado en MVP).
+
+## [2026-07-12] D-07 — Data Health Score: soportar ambos métodos
+- **Contexto:** No todos los clientes entregan su facturación real al motor.
+- **Decisión:** El motor soporta **ambos métodos** de cálculo del Data Health Score (Financiero y Operativo ponderado), seleccionables según si el cliente entrega su facturación.
+- **Consecuencias:** El diseño de módulos de scoring debe contemplar ambas rutas de cálculo, no solo una.
+
+## [2026-07-12] D-08 — Caso guía: sanduchería, motor agnóstico de sector
+- **Contexto:** El documento fuente usa una sanduchería (POS + Rappi + WhatsApp) como ejemplo recurrente.
+- **Decisión:** Se adopta la sanduchería como **caso guía ilustrativo** del MVP (nicho Retail Moderno), pero el motor se mantiene **agnóstico de sector** vía el Maestro de Sectores (YAML).
+- **Consecuencias:** Ejemplos y datos sintéticos del diseño usan el caso sanduchería; el core no debe acoplarse a ese sector.
+
+## [2026-07-12] D-09 — Esquema de datos del cliente en capas Medallion por tenant
+- **Contexto:** Se necesitaba definir cómo se organizan físicamente los datos de cada cliente, evitando el `data_real/` global y las carpetas por-periodo confusas planteadas antes.
+- **Decisión:** Cada cliente es un **tenant** (`clients/<CLIENTE>/`) con datos organizados en capas **Medallion** (bronze/silver/gold). **Silver se mantiene como capa física** persistida (no colapsada en memoria), para que el aislamiento de C-01 sea auditable.
+- **Consecuencias:** Reemplaza el diseño previo de `data_real/` global; T-11 debe crear `clients/<CLIENTE>/data/{bronze,silver,gold}/`.
+
+## [2026-07-12] D-10 — Manifiesto de procesamiento idempotente
+- **Contexto:** El motor debe saber qué archivos de un cliente ya procesó, en modo histórico e incremental/quincenal.
+- **Decisión:** Cada tenant tiene un `manifest.json` con **hash de contenido** y estado `pending`/`processed` por archivo. El periodo pasa a ser **metadato**, no una carpeta física.
+- **Consecuencias:** El core de ingesta debe leer/escribir el manifiesto antes y después de cada corrida.
+
+## [2026-07-12] D-11 — Rename `config/`→`input/` y aislamiento de C-01 vía `.gitignore` por tenant
+- **Contexto:** Definir cómo el cliente entrega sus insumos de configuración y cómo se aísla la PII real de git/indexador (C-01).
+- **Decisión:** La carpeta de configuración por cliente pasa de `config/` a **`input/`**. El aislamiento de C-01 se logra con `.gitignore` sobre **`clients/*/data/`**, en vez de un `data_real/` global.
+- **Consecuencias:** T-11 debe crear la regla `.gitignore` correspondiente; toda referencia previa a `data_real/` en `progress.md`/`tasks.md` queda superada por esta convención basada en tenant.
