@@ -16,6 +16,7 @@ Registro de las lecciones aprendidas durante la ejecución del proyecto.
 - [L-08] El gate humano de la spec (paso 7) requiere aprobación explícita; no debe darse por superado de forma implícita.
 - [L-09] `pyproject.toml` exige Python 3.13+, pero el `python` del PATH del usuario es 3.12; usar `py -3.13` / `.venv` dedicado.
 - [L-10] En el bucle TDD, un caso puede pasar en verde de inmediato si su código ya quedó cubierto por un caso anterior; la verificación honesta consiste en provocar temporalmente el defecto y confirmar el fallo, revirtiendo sin dejar rastro.
+- [L-11] Separar "ingesta" (copia + hash) de "parseo" (estructura/delimitador) evita acoplar comandos tempranos del pipeline a un formato específico.
 
 ---
 
@@ -68,3 +69,8 @@ Registro de las lecciones aprendidas durante la ejecución del proyecto.
 - **Situación:** En el bucle TDD de `client_scaffold`, varios casos (2-7, 11-13) tenían su código de producción ya cubierto desde el Caso 2 (que implementó la estructura completa del tenant), por lo que sus tests pasaban en verde apenas se escribían, sin una fase ROJA clásica.
 - **Lección:** Que un test pase de inmediato no basta como evidencia de que realmente ejercita el comportamiento esperado. En esos casos, `tdd_tester` provocó temporalmente el defecto correspondiente en el código de producción, confirmó que el test fallaba por la razón correcta, y revirtió el cambio dejando el diff limpio antes de continuar — una "verificación razonada honesta" que sustituye a la fase ROJA cuando esta no puede ocurrir de forma natural.
 - **Acción futura:** Aplicar esta técnica (romper temporalmente, confirmar el fallo, revertir sin rastro) cada vez que un test nuevo pase en verde sin haber tenido fase ROJA, antes de darlo por válido.
+
+## [2026-07-13] L-11 — Separar ingesta (copia + hash) de parseo (estructura/delimitador)
+- **Situación:** Al diseñar el alcance del segundo Tracer Bullet `ingest`, surgió la tentación de que el comando validara "es un CSV legible" o infiriera el delimitador del archivo.
+- **Lección:** Acoplar la ingesta temprana a un formato específico (validar que sea "un CSV legible") compromete la agnosticidad del pipeline frente a variaciones de delimitador (`,`/`;`/`|`) o estructura, que son responsabilidad de una etapa posterior (el Contrato de Datos / YAML 1). El principio "archivador notarial" — copiar bytes fielmente y hashear, sin parsear — mantiene `ingest` simple, robusto y reutilizable para cualquier extensión de la allow-list.
+- **Acción futura:** Al diseñar comandos tempranos del pipeline (ingesta, registro, staging), limitar su validación a lo estrictamente agnóstico de formato (existencia, no vacío, extensión permitida) y diferir toda validación de estructura/contenido a la etapa de contrato de datos.
