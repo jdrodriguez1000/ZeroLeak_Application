@@ -24,6 +24,8 @@ Registro de las decisiones tomadas durante la ejecución del proyecto.
 - [D-16] Nombres de los 3 YAML de `input/` en inglés (`contract_data.yaml`, `business_rules.yaml`, `finance.yaml`)
 - [D-17] Alcance del segundo Tracer Bullet `ingest`: registro en bronze con dedupe por `sha256`, sin parsear contenido, allow-list `.csv`/`.xlsx`, entrada archivo o carpeta con recorrido plano
 - [D-18] 🔓 **ABIERTO** — Mecanismo de emparejamiento archivo-físico → tipo de contrato (`contract_data.yaml`); a decidir al construir el feature del Contrato de Datos / `load_config`
+- [D-19] Gate humano del notebook `ingest` (paso 5): nombrado en bronze con sufijo `__<sha8>`, exit codes 0/1/2, `duplicate` = no-op (SKIP)
+- [D-20] Gate humano de la spec `ingest` (paso 7): extensiones case-insensitive, manifest de 4 campos exactos, `ingested_at` con `timespec` de segundos
 
 ---
 
@@ -118,3 +120,13 @@ Registro de las decisiones tomadas durante la ejecución del proyecto.
 - **Contexto:** Surgió al discutir el alcance de `ingest` (ver [D-17]). El `contract_data.yaml` describe **tipos/estructuras de archivo** (p. ej. "Ventas POS", "Rappi", "Clientes"), no una lista fija de nombres; un mismo contrato puede aplicar a varios archivos físicos (p. ej. 3 meses de POS). Como `ingest` es un "archivador notarial" que ingiere **todo** lo que caiga en la carpeta (filtrado solo por la allow-list `.csv`/`.xlsx`, D-17), puede haber desajuste entre lo ingerido y lo que el contrato describe: p. ej. **3 contratos pero 5 archivos** en la carpeta de carga. Ese desajuste **no rompe `ingest`**; se resuelve en la etapa de validación: un archivo se audita solo si hay un contrato que lo describa, los extras se marcan como *no reconocidos / omitidos* y los tipos esperados que no llegaron como *faltantes*.
 - **Pregunta abierta:** ¿**cómo** se empareja cada archivo físico ingerido con su tipo de contrato? Opciones a evaluar: (a) **patrón de nombre** declarado en el contrato (ej. `match: "ventas_pos_*.csv"`); (b) **declaración/mapeo explícito** por parte del DS; (c) **sniffing de columnas** (inferir el tipo por su estructura). El `system_design.md` (§5) aún no fija el mecanismo.
 - **Relacionado:** [D-17] (alcance de `ingest`), [D-10] (manifiesto con hash de contenido), §5 y §11 de `700_architecture/system_design.md`. Contexto adicional: los `input/*.yaml` los llena **el DS a mano** en el onboarding (guiado por el Maestro de Sectores, §12), conceptualmente después de `client new` y antes de validar; `ingest` no requiere que estén llenos.
+
+## [2026-07-13] D-19 — Gate humano del notebook `ingest` (paso 5): nombrado, exit codes y duplicate=SKIP
+- **Contexto:** Al aprobar `ingest.ipynb` (spike ejecutado con datos sintéticos), quedaban abiertos tres puntos de comportamiento observable que la spec (paso 6) necesitaba fijar como contrato formal.
+- **Decisión:** (a) Ante colisión de **nombre** con **contenido distinto** en bronze, el archivo se almacena con sufijo `__<sha8>` (8 primeros hex del sha256) sin sobrescribir el original. (b) Exit codes del comando: `0` = éxito total; `1` = procesamiento parcial o fallo por ruta (ver D-17, no aborta el resto); `2` = fallo global por tenant inexistente (precondición). (c) Un archivo cuyo `sha256` ya está en el manifest es **no-op idempotente** (`duplicate`/SKIP): no se copia, no genera entrada nueva, y **no cuenta como fallo** (no afecta el exit code).
+- **Consecuencias:** Estos tres puntos quedaron materializados en `610_features/ingest/spec.md` (CA-05, CA-06, CA-08, CA-09, CA-12) y validados en el bucle TDD (Casos 1, 4, 5).
+
+## [2026-07-13] D-20 — Gate humano de la spec `ingest` (paso 7): defaults de validación y manifest
+- **Contexto:** Al aprobar `spec.md` (12 CA), quedaban tres defaults de implementación por fijar antes de pasar al plan (paso 8).
+- **Decisión:** (a) La comparación de **extensión** contra la allow-list (`.csv`/`.xlsx`) es **case-insensitive** (`.CSV`/`.Csv` también son válidos). (b) La entrada del manifest contiene **exactamente** 4 campos: `file`, `sha256`, `ingested_at`, `status` — la **ausencia** de `period`, `run_id` y `output` es verificable y forma parte del contrato (no son placeholders vacíos, simplemente no existen en esta etapa). (c) `ingested_at` se serializa en ISO-8601 con `timespec="seconds"` (sin microsegundos).
+- **Consecuencias:** Materializado en CA-02 (forma del manifest) y validado en el Caso 3 del bucle TDD (test de caracterización, ver `lessons.md` L-13).

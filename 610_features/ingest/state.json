@@ -1,0 +1,118 @@
+{
+  "feature": "ingest",
+  "status": "in_progress",
+  "current_stage": "tdd",
+  "stages": {
+    "feature_contract": {
+      "status": "done",
+      "artifact": "feature_contract.md",
+      "owner": "main_session"
+    },
+    "feature_definer": {
+      "status": "done",
+      "artifact": "definition.md"
+    },
+    "notebook_writer": {
+      "status": "done",
+      "artifact": "ingest.ipynb",
+      "gate": "human",
+      "awaiting_approval": false,
+      "approved": true
+    },
+    "spec_writer": {
+      "status": "done",
+      "artifact": "spec.md",
+      "gate": "human",
+      "awaiting_approval": false,
+      "approved": true
+    },
+    "plan_builder": {
+      "status": "done",
+      "artifact": "plan.md",
+      "gate": "human",
+      "awaiting_approval": false,
+      "approved": true
+    },
+    "tdd": {
+      "status": "in_progress",
+      "cases": [
+        {
+          "id": 1,
+          "status": "refactored",
+          "ca": [
+            "CA-08"
+          ],
+          "tsk": [
+            "TSK-02",
+            "TSK-03"
+          ],
+          "desc": "ingest_paths sobre un tenant inexistente lanza TenantNotFoundError sin crear/modificar bronze ni manifest de ningun tenant. TSK-02 (tdd_tester) escrito: test 'test_ingest_paths_tenant_inexistente_lanza_tenant_not_found_error_sin_tocar_disco' en app/tests/test_ingest.py; fixtures nuevas en conftest.py (TSK-01 parcial): 'ingestible_tenant' (factory de tenant con data/bronze/ + data/manifest.json inicial) y 'read_manifest' (helper de lectura del manifest). El Caso 1 deliberadamente NO usa 'ingestible_tenant' (el tenant SANDUCHERIA no se crea) para ejercer la precondicion global de tenant inexistente sobre un clients_root limpio. GREEN confirmado (TSK-03, tdd_coder): creado app/src/zeroleak/ingest/core.py con 'TenantNotFoundError' y 'ingest_paths(client, paths, clients_root)' minimo -- solo la precondicion global de tenant (verifica data/bronze/ + data/manifest.json; si falta cualquiera, lanza TenantNotFoundError sin tocar disco). Reexport agregado en app/src/zeroleak/ingest/__init__.py. Suite completa: 44 passed, 0 failed (sin regresiones en client_scaffold; test_ingest.py Caso 1 en verde). REFACTOR (tdd_refactor, paso 10): revisado core.py y __init__.py; codigo ya minimo y cohesivo (docstrings con referencia a CA-08/TSK-03, nombres claros tenant_dir/bronze_dir/manifest_path). Unico cambio aplicado -- consistencia de tipado con el resto del proyecto (scaffold.py): 'List[str]'/'Union[str, Path]' (typing) reemplazados por 'list[str]'/'str | Path' (builtin generics, ya soportado por 'from __future__ import annotations'); sin cambio de comportamiento. No se extrajeron helpers para validacion/hash-copia/nombrado/ledger (TSK-26 completo) ni se toco cli.py (TSK-27) porque ese codigo aun no existe -- se implementa en los casos 2+ del bucle; TSK-26/TSK-27 permanecen 'no_implementada' en plan.md hasta que exista el codigo que refactorizan. Suite completa tras refactor: 44 passed, 0 failed."
+        },
+        {
+          "id": 2,
+          "status": "refactored",
+          "ca": [
+            "CA-01"
+          ],
+          "tsk": [
+            "TSK-01",
+            "TSK-04",
+            "TSK-05"
+          ],
+          "desc": "Un .csv sintetico valido se copia byte a byte a data/bronze/<file> (sha256 igual) y agrega una entrada con ese sha256 y status == 'pending'. TSK-04 (tdd_tester) escrito: test 'test_ingest_paths_csv_valido_copia_a_bronze_y_agrega_entrada_pending' en app/tests/test_ingest.py; usa las fixtures existentes 'ingestible_tenant' y 'read_manifest' (TSK-01, sin fixtures nuevas necesarias para este caso: el .csv sintetico se escribe directo en tmp_path dentro del test). El test crea el tenant SANDUCHERIA (ingestible_tenant), escribe un .csv sintetico fuera del tenant, invoca ingest_paths y verifica: (a) el archivo aparece en data/bronze/<file> con bytes identicos (sha256 igual al original); (b) manifest.json tiene exactamente una entrada nueva con ese sha256 y status=='pending'; (c) el resultado retornado expone exit_code == 0. RED confirmado: pytest app/tests/test_ingest.py -> 1 passed (Caso 1, sin regresion), 1 failed (Caso 2) -- fallo esperado en 'assert archivo_bronze.is_file()' porque ingest_paths aun no implementaba el camino feliz (solo la precondicion de tenant del Caso 1); no fue error de import/setup. GREEN confirmado (TSK-05, tdd_coder): implementado camino feliz minimo en app/src/zeroleak/ingest/core.py -- dataclass 'IngestResult' (ingested/duplicates/failed + propiedad derivada 'exit_code': 1 si 'failed' no vacio, si no 0) y 'ingest_paths' ahora, tras la precondicion de tenant existente, carga el manifest una vez, para cada 'path' de 'paths' lee sus bytes, calcula sha256, copia byte a byte (shutil.copyfile) a data/bronze/<nombre-original>, construye la entrada exacta {file, sha256, ingested_at (isoformat timespec='seconds'), status='pending'} y la acumula tanto en 'result.ingested' como en manifest['files']; persiste el manifest en una sola escritura al final y retorna el IngestResult. No se implemento validacion (vacio/extension), dedupe, colision de nombre ni recorrido de carpetas -- eso corresponde a TSK-07/09/11/13/15 en casos posteriores (minimo suficiente, E4/NC-2). Reexport de 'IngestResult' agregado en app/src/zeroleak/ingest/__init__.py. Suite completa: 45 passed, 0 failed (sin regresiones; Caso 1 y Caso 2 en verde). REFACTOR (tdd_refactor, paso 10): revisado core.py y __init__.py sobre GREEN de partida (45 passed). Extraidos dos helpers privados cohesivos siguiendo el patron de client_scaffold.py (funciones privadas con guion bajo, docstring con referencia a CA): '_resolve_tenant_paths(tenant_dir)' (arma las rutas data/bronze/ y data/manifest.json bajo el tenant, sin verificar existencia -- esa sigue siendo responsabilidad de la precondicion en ingest_paths, CA-08) y '_build_manifest_entry(name, sha256)' (constructor de la entrada pending del manifest, CA-02) que reemplaza el diccionario 'entrada' inline. Renombradas variables locales del bucle de espanol a ingles para consistencia con el resto del proyecto (scaffold.py usa identificadores en ingles): 'origen'->'source', 'contenido'->'content', 'destino'->'destination', 'entrada'->'entry'. Sin cambio de comportamiento ni de la firma publica de 'ingest_paths'/'IngestResult'/'TenantNotFoundError'. No se toco __init__.py (ya minimo: solo reexporta). No se extrajeron helpers para validacion, dedupe, nombrado con sufijo ni recorrido de carpetas/ledger completo (alcance de TSK-26) porque ese codigo aun no existe -- se implementa en los casos 3+ del bucle; TSK-26/TSK-27 permanecen 'no_implementada' en plan.md hasta que exista el codigo que refactorizan (mismo criterio aplicado en el refactor del Caso 1). Suite completa tras refactor: 45 passed, 0 failed (pytest app/tests -q)."
+        },
+        {
+          "id": 3,
+          "status": "characterized",
+          "ca": [
+            "CA-02"
+          ],
+          "tsk": [
+            "TSK-06",
+            "TSK-07"
+          ],
+          "desc": "La entrada del manifest tiene exactamente file, sha256 (64 hex), ingested_at (ISO, segundos) y status; sin period/run_id/output. TSK-06 (tdd_tester) escrito: test 'test_ingest_paths_entrada_manifest_tiene_exactamente_los_4_campos_de_ca02' en app/tests/test_ingest.py -- verifica set(entrada.keys()) == {file, sha256, ingested_at, status}, aserciones negativas explicitas ('period' not in entrada, 'run_id' not in entrada, 'output' not in entrada), sha256 con regex [0-9a-f]{64}, e ingested_at con regex exacto YYYY-MM-DDTHH:MM:SS + datetime.fromisoformat(...).microsecond == 0 y .tzinfo is None. NO HUBO CICLO ROJO-VERDE CLASICO: al escribir el test y ejecutarlo contra el core.py existente (sin ningun cambio de codigo) el resultado fue 3 passed de inmediato -- se confirmo que CA-02 ya estaba completamente satisfecho como efecto colateral del refactor del Caso 2 (helper '_build_manifest_entry(name, sha256)' en core.py, construido durante TSK-05/refactor de tdd_refactor), que ya emite hardcoded exactamente esas 4 claves con datetime.now().isoformat(timespec='seconds'). Se reporto el hallazgo a la sesion principal en vez de forzar un test artificial; decision recibida: tratar el test como CARACTERIZACION/REGRESION (no RED/GREEN), mantenerlo para blindar CA-02 contra regresiones futuras. TSK-06 marcado 'implementada' (test escrito y en verde, con nota de que no hubo RED). TSK-07 marcado 'cancelada_suspendida' en plan.md (no se escribio codigo nuevo porque CA-02 ya estaba cubierto por TSK-05; no corresponde a tdd_coder abrir una tarea sin entregable). Suite completa: pytest app/tests -q -> 46 passed, 0 failed (sin regresiones). No se toco core.py ni ningun otro archivo de produccion en este caso."
+        },
+        {
+          "id": 4,
+          "status": "refactored",
+          "ca": [
+            "CA-09"
+          ],
+          "tsk": [
+            "TSK-08",
+            "TSK-09"
+          ],
+          "desc": "Un archivo de 0 bytes se reporta como fallo 'archivo vacio', no se copia ni se anota, y la invocacion retorna exit_code == 1. TSK-08 (tdd_tester) escrito: test 'test_ingest_paths_archivo_vacio_se_reporta_como_fallo_y_no_se_ingiere' en app/tests/test_ingest.py -- usa las fixtures existentes 'ingestible_tenant' y 'read_manifest' (TSK-01; no se creo un generador de archivo vacio en conftest.py porque el archivo se escribe inline en tmp_path con write_bytes(b''), igual que el patron ya usado para el .csv del Caso 2). El test crea el tenant SANDUCHERIA, escribe un archivo vacio.csv de 0 bytes fuera del tenant, invoca ingest_paths y verifica: (a) data/bronze/ queda vacio (el archivo NO se copia); (b) manifest['files'] sigue en [] (el ledger no se corrompe, ninguna entrada nueva); (c) resultado.failed tiene exactamente 1 item con reason == 'archivo vacio'; (d) resultado.ingested == []; (e) resultado.exit_code == 1. RED confirmado: pytest app/tests/test_ingest.py -> 3 passed (Casos 1-3, sin regresion), 1 failed (Caso 4) -- fallo esperado en 'assert list(bronze_dir.iterdir()) == []' porque el core actual (TSK-05, camino feliz del Caso 2) todavia no valida tamano > 0 y copia el archivo vacio a bronze en vez de enrutarlo a failed; no fue error de import/setup. TSK-08 marcado 'implementada' en plan.md. GREEN confirmado (TSK-09, tdd_coder): en app/src/zeroleak/ingest/core.py, dentro del bucle for de 'ingest_paths', se agrego -- antes de leer bytes/calcular sha256/copiar -- una guarda 'if source.stat().st_size == 0: result.failed.append({\"path\": path_str, \"reason\": \"archivo vacío\"}); continue' que enruta el archivo vacio a 'failed' con el motivo exacto exigido por el test, sin copiar a bronze ni tocar el manifest (el 'continue' salta la construccion de entry/copyfile/append a manifest['files'] para esa ruta). El 'exit_code' derivado (IngestResult.exit_code, ya existente desde el Caso 2/TSK-05: 1 si 'failed' no vacio) no requirio cambio -- se verifico que ya cubre este caso. Solo se implemento la validacion de tamano > 0 (motivo 'archivo vacio'); NO se implemento validacion de existencia de ruta ('la ruta no existe') ni de extension fuera de allow-list -- esos quedan para casos posteriores del bucle (TSK-09 marcado 'implementada (parcial)' en plan.md, con nota explicita). No se toco ningun test. Suite completa: pytest app/tests -q -> 47 passed, 0 failed (sin regresiones en los 46 tests previos; Caso 4 en verde). REFACTOR (tdd_refactor, paso 10): revisado core.py sobre GREEN de partida (47 passed). Cambios aplicados, todos preservando comportamiento: (1) extraida la constante modulo-nivel 'REASON_EMPTY_FILE = \"archivo vacío\"' (antes el string vivia hardcoded inline en el bucle), coherente con plan.md linea 24 ('Motivos de fallo como constantes de texto estable'); (2) extraido el helper privado '_validate_file(source) -> str | None' que consolida la UNICA validacion existente (tamano > 0) y retorna el motivo de fallo o 'None', reemplazando el 'if source.stat().st_size == 0' inline en 'ingest_paths'; deliberadamente NO se anticiparon validaciones de existencia de ruta ni de extension (aun no implementadas, TSK-09 parcial) -- el docstring del helper documenta explicitamente ese alcance parcial; (3) actualizado el docstring de modulo (referencia a TSK-09/CA-09) y el docstring de 'ingest_paths' para referenciar 'REASON_EMPTY_FILE' en vez del string literal. Revisado '__init__.py': ya minimo (solo reexporta 'IngestResult'/'TenantNotFoundError'/'ingest_paths'), sin nada que refactorizar. No se toco cli.py (TSK-27, ese codigo aun no existe) ni se completo TSK-26 (helpers de dedupe/nombrado/carpetas/ledger no existen todavia). Suite completa tras refactor: pytest app/tests -q -> 47 passed, 0 failed (mismo conteo que antes del refactor, sin regresiones)."
+        },
+        {
+          "id": 5,
+          "status": "refactored",
+          "ca": [
+            "CA-05"
+          ],
+          "tsk": [
+            "TSK-10",
+            "TSK-11"
+          ],
+          "desc": "Reenviar un archivo con sha256 ya presente es no-op (SKIP): sin copia ni entrada nueva, exit_code == 0 (no cuenta como fallo). TSK-10 (tdd_tester) escrito: dos tests en app/tests/test_ingest.py -- 'test_ingest_paths_dedupe_sha256_reenviar_archivo_ya_ingerido_es_no_op_skip' (ingesta previa en una invocacion, luego se reenvia un archivo con nombre distinto pero mismo contenido en una segunda invocacion) y 'test_ingest_paths_dedupe_sha256_dentro_de_la_misma_invocacion_segunda_ruta_es_duplicate' (dos rutas con contenido identico en la MISMA invocacion, cubriendo el punto de la seccion 'Riesgos Tecnicos' del plan sobre dedupe intra-corrida). Ambos usan las fixtures existentes 'ingestible_tenant' y 'read_manifest' (TSK-01, sin fixtures nuevas). Cada test verifica: (a) data/bronze/ conserva un unico archivo (no se copia el duplicado); (b) manifest['files'] conserva una unica entrada; (c) resultado.duplicates tiene exactamente 1 item con 'sha256' (hash del contenido) y 'status'=='duplicate'; (d) resultado.failed == [] (el duplicado NO cuenta como fallo); (e) resultado.exit_code == 0. RED confirmado: pytest app/tests -q -> 47 passed (Casos 1-4, sin regresion), 2 failed (Caso 5) -- fallo esperado en ambos tests en 'assert len(archivos_bronze) == 1'/'assert len(list(bronze_dir.iterdir())) == 1' (assert 2 == 1) porque el core actual (TSK-09, Caso 4) todavia no calcula ni compara sha256 contra el manifest -- copia y anota la segunda entrada con contenido duplicado en vez de enrutarla a 'duplicates'; no fue error de import/setup (el resto de la suite, 47 tests previos, sigue en verde sin regresiones). TSK-10 marcado 'implementada' en plan.md. GREEN confirmado (TSK-11, tdd_coder): en app/src/zeroleak/ingest/core.py, tras cargar el manifest, se construye 'known_sha256 = {entry[\"sha256\"] for entry in manifest[\"files\"]}' (cubre el ledger previo). Dentro del bucle for, despues de calcular el sha256 del path valido y ANTES de copiar, se agrego la guarda 'if sha256 in known_sha256: result.duplicates.append({\"path\": path_str, \"sha256\": sha256, \"status\": \"duplicate\"}); continue' que enruta el duplicado sin copiar a bronze ni tocar el manifest. Cuando una ruta SI se ingiere normalmente, se agrega 'known_sha256.add(sha256)' junto al append a manifest['files'], de modo que el mismo set en memoria cubre tanto el ledger previo (cargado al inicio) como las entradas acumuladas en la corrida actual (dedupe intra-invocacion), sin necesidad de estructura adicional. No se toco ningun test ni se implemento nombrado con sufijo __<sha8> (colision de nombre, TSK-12/13), validacion de existencia/extension, ni recorrido de carpetas -- eso queda para casos posteriores (minimo suficiente, E4/NC-2). Suite completa: pytest app/tests -q -> 49 passed, 0 failed (sin regresiones en los 47 tests previos; Caso 5 en verde). REFACTOR (tdd_refactor, paso 10): revisado core.py sobre GREEN de partida (49 passed). El codigo ya venia bien organizado por los refactors de casos previos (helpers '_resolve_tenant_paths'/'_validate_file'/'_build_manifest_entry'); no habia duplicacion material que eliminar en el bucle de 'ingest_paths'. Cambios aplicados, todos preservando comportamiento: (1) extraido el helper privado '_hash_file(source: Path) -> str' que consolida 'source.read_bytes()' + 'hashlib.sha256(...).hexdigest()' -- antes vivia inline en el bucle con una variable intermedia 'content' que solo se usaba para hashear; ahora el bucle queda como una secuencia legible de 4 pasos (validar -> hashear -> chequear dedupe -> copiar+anotar), simetrico con los demas helpers ya extraidos; (2) anotados los tipos de los tres campos de 'IngestResult' como 'list[dict]' (antes 'list' generico) con un docstring de una linea por campo documentando la forma exacta de cada item (ingested/duplicates/failed), consistente con el resto del modulo que ya usa generics de builtin; (3) actualizado el docstring de 'ingest_paths' para documentar tambien el comportamiento de dedupe (CA-05, faltaba esa mencion pese a estar implementado desde TSK-11) y el docstring de modulo para referenciar '_hash_file'. Deliberadamente NO se extrajo un helper que combine validacion+dedupe+copia en una sola funcion de 'paso por ruta' (evaluado y descartado): el bucle actual es corto (aprox. 20 lineas), cada paso ya delega a una funcion de una sola responsabilidad, y consolidar mas alla de eso anadiria parametros (bronze_dir, manifest, known_sha256, result) sin reducir complejidad real -- seria abstraccion especulativa (E4/NC-2) anticipando TSK-13/15/17/21 (colision de nombre, carpetas, multi-ruta, procesamiento parcial) que aun no existen. No se toco cli.py (TSK-27, ese codigo aun no existe) ni se toco __init__.py (ya minimo, solo reexporta). No se modifico ningun test. Suite completa tras refactor: pytest app/tests -q -> 49 passed, 0 failed (mismo conteo que antes del refactor, sin regresiones). Siguiente eslabon: tdd_tester (Caso 6, TSK-12/13, CA-06 -- colision de nombre con sufijo __<sha8>)."
+        }
+      ]
+    },
+    "integration_tester": {
+      "status": "pending"
+    },
+    "spec_verifier": {
+      "status": "pending",
+      "artifact": "verification.md"
+    },
+    "human_test": {
+      "status": "pending",
+      "gate": "human"
+    },
+    "merge_to_main": {
+      "status": "pending",
+      "gate": "human"
+    }
+  }
+}

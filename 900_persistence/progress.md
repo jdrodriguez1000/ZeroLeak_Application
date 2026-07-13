@@ -17,26 +17,41 @@ Consultándolo siempre sabemos el estado y avance actual del proyecto.
 - [2026-07-13] T-21 avanzada (paso 10 completo): bucle TDD cerrado (13/13 casos `refactored`), código de producción en `app/src/zeroleak/core/scaffold.py` y `app/src/zeroleak/cli.py`, suite completa 39 passed; renombrados a inglés los 3 YAML de `input/` (`contract_data.yaml`, `business_rules.yaml`, `finance.yaml`); creado el tenant real `COMPANY_DEMO` (TSK-24) por la vía oficial; entorno `.venv/` con Python 3.13 configurado en la raíz del repo.
 - [2026-07-13] Tracer Bullet `client_scaffold` **CERRADO (pasos 11-13):** integración e2e (TSK-25) contra `zlk client new` por subprocess (suite 43 passed, cubre CA-01..CA-08); `spec_verifier` auditó los 10 CA con veredicto CONFORME (`610_features/client_scaffold/verification.md`); el humano aprobó y mergeó el PR #1 a `main`. Actualizado `README.md` con secciones "Entorno de desarrollo" y "Uso del CLI". Decidida la siguiente feature del segundo Tracer Bullet: `ingest` (D-17, T-26).
 - [2026-07-13] T-28 (Tracer Bullet `ingest`) iniciado: rama `feature/ingest` creada desde `main`, carpeta `610_features/ingest/` creada, paso 2 del flujo completado con `feature_contract.md` escrito por la sesión principal (materializa D-17, deja D-18 fuera de alcance). Paso 3 (`feature_definer`) pendiente.
+- [2026-07-13] T-28 avanzado (pasos 3-9 completos, paso 10 al 42%): `definition.md` (8 HU), `ingest.ipynb` ejecutado y aprobado (gate paso 5, 3 decisiones ratificadas: sufijo `__<sha8>` en colisión, exit codes 0/1/2, duplicate=SKIP no-op), `spec.md` con 12 CA aprobada (gate paso 7, 3 defaults ratificados: extensiones case-insensitive, manifest con solo 4 campos, `ingested_at` timespec segundos), `plan.md` con 27 TSK y 12 casos aprobado (gate paso 9). Bucle TDD (paso 10): 5 de 12 casos cerrados (CA-08, CA-01, CA-02 caracterizado, CA-09, CA-05); código de producción en `app/src/zeroleak/ingest/core.py`; suite 49 passed. Sesión suspendida a pedido del humano tras el Caso 5.
 
 ---
 
 ## Estado actual
 El proyecto **ZeroLeak** está construyendo su **segundo Tracer Bullet, `ingest` (T-28)**, sobre la rama
 `feature/ingest` (creada desde `main`, que ya contiene el primer Tracer Bullet `client_scaffold` mergeado
-vía PR #1). Del flujo de 13 pasos, el **paso 2 está completo**: se creó la carpeta `610_features/ingest/`
-y la sesión principal escribió `feature_contract.md`, materializando el alcance acordado en D-17 (comando
-`zlk ingest <CLIENTE> <ruta>...` con uno o varios argumentos de archivo o carpeta con recorrido plano sin
-recursión; copia inmutable a `clients/<CLIENTE>/data/bronze/`; hash `sha256`; entrada en `manifest.json`
-con status `pending`; dedupe por `sha256` que habilita el Modo Incremental; principio "archivador
-notarial" — no parsea contenido; validación básica agnóstica de formato: tenant existe, archivo existe y
-no está vacío, extensión en allow-list; allow-list MVP `.csv`/`.xlsx` únicamente; 6 criterios de aceptación
-a nivel feature) y dejando explícitamente fuera D-18 (emparejamiento archivo físico → tipo de contrato,
-punto abierto para la futura feature de Contrato de Datos/`load_config`). El **próximo paso pendiente es
-el paso 3**: invocar al agente `feature_definer` para producir `610_features/ingest/definition.md` con las
-historias de usuario (HU-xx); el humano aún no decidió si revisa primero el `feature_contract.md` o lanza
-directo el `feature_definer`. El `feature_contract.md` quedó sin versionar en el working tree al cierre de
-esta sesión; se sube en el commit de cierre. La carpeta `clients/MI_BUNUELO/` sigue siendo un tenant de
-prueba manual del humano, sin versionar.
+vía PR #1). Del flujo de 13 pasos, los **pasos 1 a 9 están completos** y el **paso 10 (bucle TDD) va al
+42% (5 de 12 casos)**. Artefactos existentes en `610_features/ingest/`: `feature_contract.md` (paso 2,
+materializa D-17); `definition.md` con 8 historias HU-01…HU-08 (paso 3, `feature_definer`); `ingest.ipynb`
+(paso 4, spike con datos sintéticos, ejecutado in-place tras instalar `nbconvert`+`ipykernel` en el `.venv`
+porque el agente no tenía kernel); gate humano del notebook (paso 5) **aprobado**, ratificando 3 decisiones:
+(a) nombrado en bronze ante colisión de nombre con sufijo `__<sha8>`; (b) exit codes `0`=éxito total,
+`1`=parcial o fallo por ruta, `2`=fallo global por tenant inexistente; (c) `duplicate` = no-op idempotente
+(SKIP), no cuenta como fallo; `spec.md` con 12 criterios CA-01…CA-12 (paso 6, `spec_writer`), trazables a
+las HU; gate humano de la spec (paso 7) **aprobado**, ratificando 3 defaults: extensiones case-insensitive,
+manifest con **solo** `file`/`sha256`/`ingested_at`/`status` (ausencia verificable de `period`/`run_id`/
+`output`), `ingested_at` con `timespec` de segundos; `plan.md` con 27 tareas TSK-01…TSK-27 y 12 casos de
+test (paso 8, `plan_builder`), gate humano (paso 9) **aprobado**; `state.json` creado siguiendo el patrón
+de `client_scaffold`, con `current_stage="tdd"`. El **bucle TDD (paso 10)** completó **5 de los 12 casos**
+definidos, organizados en bloques (bloque 1 = caso 1; bloque 2 = casos 2-5), todos en estado `refactored`
+salvo el Caso 3 (`characterized`, sin ciclo RED/GREEN porque CA-02 ya quedó satisfecho como efecto
+colateral del Caso 2 — TSK-06 `implementada` como test de caracterización/regresión, TSK-07 `cancelada_
+suspendida` sin código nuevo): Caso 1 (CA-08, tenant inexistente → `TenantNotFoundError`/exit 2), Caso 2
+(CA-01, ingesta csv byte-a-byte + entrada `pending`), Caso 3 (CA-02, forma exacta del manifest,
+caracterización), Caso 4 (CA-09, archivo vacío → fallo por ruta/exit 1), Caso 5 (CA-05, dedupe por
+`sha256` → SKIP/exit 0, incluyendo dedupe intra-invocación). Código de producción:
+`app/src/zeroleak/ingest/core.py` (`ingest_paths`, `IngestResult`, `TenantNotFoundError`, helpers
+`_resolve_tenant_paths`, `_validate_file`, `_hash_file`, `_build_manifest_entry`) y su `__init__.py`; tests
+en `app/tests/test_ingest.py` y fixtures nuevas en `app/tests/conftest.py` (`ingestible_tenant`,
+`read_manifest`). Suite total: **49 passed**, sin regresiones. El trabajo fue **suspendido a pedido del
+humano** tras el Caso 5. El **próximo paso pendiente** es continuar el bucle TDD: **bloque 3 (casos 6-9)**
+y **bloque 4 (casos 10-12)**, y luego los pasos 11-13 (integración TSK-25, `spec_verifier`, gate humano
+final, PR hacia `main`). La carpeta `clients/MI_BUNUELO/` sigue siendo un tenant de prueba manual del
+humano, sin versionar.
 
 El proyecto **cerró su primer Tracer Bullet, `client_scaffold` (T-21)**, con los 13 pasos del
 flujo completos: `feature/client_scaffold` fue mergeada a `main` vía PR #1, aprobado y mergeado por el
@@ -152,9 +167,12 @@ el feature `client_scaffold` en `610_features/client_scaffold/` (código en
 - **[2026-07-13]** **Actualizado `README.md`** (en `main`, tras el merge): agregada sección "Entorno de desarrollo" (crear/activar `.venv` con `py -3.13`, instalar con `pip install -e ".[dev]"`, correr tests) y sección "Uso del CLI" (comando `zlk client new`, patrón de nombres, tabla de exit codes 0/1/2/3); corregida la nota obsoleta que indicaba que `zlk client new` estaba "aún no implementada".
 - **[2026-07-13]** **Decidido el alcance del segundo Tracer Bullet, `ingest` (D-17):** comando para registrar archivos del cliente en la capa bronze del tenant (copia fiel/inmutable a `clients/<CLIENTE>/data/bronze/`, hash `sha256`, entrada en `manifest.json` con status `pending`); dedupe por `sha256` (habilita Modo Incremental §10); principio "archivador notarial" — `ingest` no parsea contenido, el delimitador/estructura es problema del Contrato de Datos (YAML 1) en etapa posterior; validación agnóstica de formato (tenant existe, archivo no vacío, extensión en allow-list); allow-list MVP `.csv`/`.xlsx` únicamente, `.txt` explícitamente fuera; entrada por archivo o carpeta con recorrido plano (sin recursión), preferido sobre glob por inconsistencias de shell en PowerShell. Sin artefactos creados aún (T-26, `No implementada`).
 - **[2026-07-13]** **T-28 avanzada (pasos 1-2 del flujo, Tracer Bullet `ingest`):** creada la rama `feature/ingest` desde `main`; creada la carpeta `610_features/ingest/`; la sesión principal escribió `feature_contract.md` materializando D-17 (comando `zlk ingest <CLIENTE> <ruta>...`, uno o varios argumentos de archivo/carpeta con recorrido plano, copia inmutable a bronze, `sha256`, entrada `manifest.json` status `pending`, dedupe habilita Modo Incremental, principio "archivador notarial", validación básica agnóstica de formato, allow-list MVP `.csv`/`.xlsx`, 6 criterios de aceptación a nivel feature) y dejando D-18 explícitamente fuera de alcance. Paso 3 (`feature_definer` → `definition.md`) queda pendiente para la próxima sesión.
+- **[2026-07-13]** **T-28 avanzada (pasos 3-9 completos, Tracer Bullet `ingest`):** Paso 3: `feature_definer` produjo `610_features/ingest/definition.md` con 8 historias HU-01…HU-08. Decisión humana zanjada y reflejada en HU-05: procesamiento **parcial** por ruta con reporte de éxitos/fallos; tenant inexistente es precondición global que aborta toda la invocación. Paso 4: `notebook_writer` produjo `610_features/ingest/ingest.ipynb` (spike con datos sintéticos); como el agente no pudo ejecutarlo, la sesión principal instaló `nbconvert`+`ipykernel` en el `.venv` y ejecutó el notebook in-place, demostrando las 8 HU con evidencia visible. Paso 5 (gate humano): notebook **aprobado**, ratificando 3 decisiones: nombrado en bronze ante colisión con sufijo `__<sha8>`; exit codes 0/1/2 (éxito total/parcial-o-fallo-por-ruta/fallo global por tenant); `duplicate` = no-op idempotente (SKIP), no cuenta como fallo. Paso 6: `spec_writer` produjo `spec.md` con 12 criterios CA-01…CA-12 trazables a las HU. Paso 7 (gate humano): spec **aprobada**, ratificando 3 defaults: extensiones case-insensitive; manifest con solo `file`/`sha256`/`ingested_at`/`status` (ausencia verificable de `period`/`run_id`/`output`); `ingested_at` con `timespec` de segundos. Paso 8: `plan_builder` produjo `plan.md` con 27 tareas TSK-01…TSK-27 y 12 casos de test, todos los CA cubiertos. Paso 9 (gate humano): plan **aprobado**.
+- **[2026-07-13]** **T-28 avanzada (paso 10, bucle TDD, 5/12 casos, Tracer Bullet `ingest`):** completado el bloque 1 (caso 1) y el bloque 2 (casos 2-5) del bucle `tdd_tester → tdd_coder → tdd_refactor`. Caso 1 (CA-08): tenant inexistente → `TenantNotFoundError`/exit 2. Caso 2 (CA-01): ingesta csv byte-a-byte + entrada `pending`. Caso 3 (CA-02): forma exacta del manifest; sin ciclo RED/GREEN (CA-02 ya satisfecho por el Caso 2); conservado como test de caracterización/regresión (TSK-06 `implementada`, TSK-07 `cancelada_suspendida`). Caso 4 (CA-09): archivo vacío → fallo por ruta, exit 1. Caso 5 (CA-05): dedupe por `sha256` (SKIP, exit 0), incluyendo dedupe intra-invocación. Creado el código de producción `app/src/zeroleak/ingest/core.py` (`ingest_paths`, `IngestResult`, `TenantNotFoundError`, helpers `_resolve_tenant_paths`, `_validate_file`, `_hash_file`, `_build_manifest_entry`) y su `__init__.py`; tests en `app/tests/test_ingest.py` y fixtures nuevas en `app/tests/conftest.py` (`ingestible_tenant`, `read_manifest`). Suite total: 49 passed, sin regresiones. Creado `610_features/ingest/state.json` siguiendo el patrón de `client_scaffold`. Trabajo **suspendido a pedido del humano** tras el Caso 5.
 
 ## Lo próximo a realizar
-- **Prioridad inmediata:** continuar el flujo de 13 pasos para el segundo Tracer Bullet, **`ingest`** (T-28), con el **paso 3**: invocar al agente `feature_definer` para producir `610_features/ingest/definition.md` con las historias de usuario (HU-xx), a partir del `feature_contract.md` ya escrito. Pendiente que el humano decida si revisa primero el contrato o lanza directo el `feature_definer`.
+- **Prioridad inmediata:** continuar el bucle TDD (paso 10) del segundo Tracer Bullet, **`ingest`** (T-28): **bloque 3 (casos 6-9)** y **bloque 4 (casos 10-12)** de `plan.md`/`state.json`, sobre `app/src/zeroleak/ingest/core.py`.
+- Tras cerrar el bucle TDD: pasos 11-13 del flujo — integración e2e (TSK-25, `integration_tester` sobre `zlk ingest` por subprocess), `spec_verifier` (`verification.md`), gate humano final (`human_test`) y apertura de PR hacia `main` (`merge_to_main`).
 - (Menor) Terminar de verificar el registro completo de los agentes `.claude/agents/*.md` como subagentes tras reiniciar Claude Code (T-13); confirmar que persistan entre sesiones/reinicios.
 - (Menor) Evaluar si se desean colores distintos para los agentes que hoy comparten color (ver nota en `lessons.md` L-04).
 - (Nota) `clients/MI_BUNUELO/` es un tenant de prueba manual del humano (no es entregable); queda sin versionar en el working tree.

@@ -17,6 +17,8 @@ Registro de las lecciones aprendidas durante la ejecución del proyecto.
 - [L-09] `pyproject.toml` exige Python 3.13+, pero el `python` del PATH del usuario es 3.12; usar `py -3.13` / `.venv` dedicado.
 - [L-10] En el bucle TDD, un caso puede pasar en verde de inmediato si su código ya quedó cubierto por un caso anterior; la verificación honesta consiste en provocar temporalmente el defecto y confirmar el fallo, revirtiendo sin dejar rastro.
 - [L-11] Separar "ingesta" (copia + hash) de "parseo" (estructura/delimitador) evita acoplar comandos tempranos del pipeline a un formato específico.
+- [L-12] Los subagentes `tdd_*` no tienen kernel de Jupyter disponible; la sesión principal debe instalar `nbconvert`/`ipykernel` en el `.venv` del proyecto para ejecutar el notebook.
+- [L-13] Un test nuevo puede pasar en verde de inmediato porque el CA que cubre ya quedó satisfecho por el refactor de un caso previo; tratarlo como test de caracterización/regresión en vez de forzar un RED artificial.
 
 ---
 
@@ -74,3 +76,13 @@ Registro de las lecciones aprendidas durante la ejecución del proyecto.
 - **Situación:** Al diseñar el alcance del segundo Tracer Bullet `ingest`, surgió la tentación de que el comando validara "es un CSV legible" o infiriera el delimitador del archivo.
 - **Lección:** Acoplar la ingesta temprana a un formato específico (validar que sea "un CSV legible") compromete la agnosticidad del pipeline frente a variaciones de delimitador (`,`/`;`/`|`) o estructura, que son responsabilidad de una etapa posterior (el Contrato de Datos / YAML 1). El principio "archivador notarial" — copiar bytes fielmente y hashear, sin parsear — mantiene `ingest` simple, robusto y reutilizable para cualquier extensión de la allow-list.
 - **Acción futura:** Al diseñar comandos tempranos del pipeline (ingesta, registro, staging), limitar su validación a lo estrictamente agnóstico de formato (existencia, no vacío, extensión permitida) y diferir toda validación de estructura/contenido a la etapa de contrato de datos.
+
+## [2026-07-13] L-12 — Los subagentes `tdd_*`/`notebook_writer` no tienen kernel de Jupyter para ejecutar notebooks
+- **Situación:** Al construir `ingest.ipynb` (paso 4 del Tracer Bullet `ingest`), el agente `notebook_writer` produjo el notebook pero no pudo ejecutarlo para generar evidencia real (sin kernel/entorno disponible en su contexto de ejecución).
+- **Lección:** Los subagentes que trabajan con notebooks pueden carecer del entorno Python necesario (kernel, `nbconvert`, `ipykernel`) para ejecutarlos, aunque sí puedan escribir el JSON del `.ipynb`. La sesión principal debe asumir la ejecución cuando esto ocurra.
+- **Acción futura:** Si un agente reporta no poder ejecutar un notebook, la sesión principal debe instalar `nbconvert`+`ipykernel` en el `.venv` del proyecto (ya con Python 3.13, ver L-09) y ejecutar el notebook in-place (`jupyter nbconvert --to notebook --execute --inplace`), verificando exit code 0 y ausencia de celdas con error antes de dar el paso 4 por completo.
+
+## [2026-07-13] L-13 — Test de caracterización cuando un CA ya quedó satisfecho por un caso anterior
+- **Situación:** En el bucle TDD de `ingest`, el Caso 3 (CA-02, forma exacta del manifest) pasó en verde de inmediato al escribirse, sin ningún cambio de código: el helper `_build_manifest_entry` (extraído durante el refactor del Caso 2) ya emitía exactamente los 4 campos exigidos.
+- **Lección:** A diferencia de L-10 (donde se provoca temporalmente el defecto para confirmar honestamente el fallo), aquí no aplicaba esa técnica porque no había ningún comportamiento "por romper": el CA ya estaba cubierto como efecto colateral genuino de una decisión de diseño anterior (el helper). En ese caso, forzar un RED artificial sería teatro, no verificación. La resolución correcta es reportar el hallazgo a la sesión principal, decidir explícitamente tratar el test como **caracterización/regresión** (blindaje contra regresiones futuras, no evidencia de un ciclo TDD clásico) y dejar constancia de esa decisión en `plan.md`/`state.json` (marcando la tarea de test como `implementada` con la nota correspondiente, y la tarea de código como `cancelada_suspendida` si no hay nada nuevo que escribir).
+- **Acción futura:** Antes de forzar un RED artificial en un caso que pasa en verde de inmediato, evaluar si existe un comportamiento real que romper (L-10) o si el CA ya fue satisfecho genuinamente por trabajo previo (L-13); en el segundo caso, documentar la decisión explícitamente en vez de simular un ciclo que no ocurrió.
