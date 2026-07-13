@@ -20,7 +20,8 @@ Registro de las tareas realizadas y por realizar del proyecto.
 - T-17, T-18 → **Implementada** (convención `610_features/` alineada en todo el repo; verificación de aislamiento C-01)
 - T-19 → **Implementada** (revisión de D-05: excepciones de modelo para `feature-definer` y `notebook-writer`)
 - T-20 → **Implementada** (refactor estructural: `config/`, `data_synthetic/`, `src/`, `tests/` movidos a `app/`)
-- T-21 → **No implementada** (construir artefactos SDD+TDD completos del Tracer Bullet `client_scaffold`; solo se hizo el análisis/diseño)
+- T-21 → **No implementada** (Tracer Bullet `client_scaffold`; pasos 1-9 del flujo completados en rama `feature/client_scaffold`, bucle TDD pendiente)
+- T-22 → **No implementada** (bucle TDD de `client_scaffold` sobre los 13 casos definidos; siguiente paso al retomar)
 
 ---
 
@@ -48,4 +49,5 @@ Registro de las tareas realizadas y por realizar del proyecto.
 | T-18 | Verificar aislamiento de datos de cliente (C-01) en el esqueleto del motor | Implementada | 2026-07-12 | `git check-ignore` confirma que `clients/*/data/` queda ignorado; carpeta de prueba `clients/` borrada tras verificar, sin tenants commiteados |
 | T-19 | Revisar D-05 con excepciones de modelo para `feature-definer` (sonnet) y `notebook-writer` (opus) | Implementada | 2026-07-12 | actualizado `decisions.md` D-05 y apéndice de `905_guideline/methodology.md` |
 | T-20 | Refactor estructural: mover `config/`, `data_synthetic/`, `src/`, `tests/` a `app/` | Implementada | 2026-07-12 | `git mv`; `clients/` permanece en raíz (D-15); actualizadas referencias en `pyproject.toml`, 9 agentes, templates, `README.md`, `610_features/README.md`, `methodology.md`, `system_design.md`; corregido bug de doble prefijo `app/app/tests/` en 10 lugares; verificado `import zeroleak` y `pytest testpaths: app/tests` |
-| T-21 | Construir Tracer Bullet `client_scaffold` (artefactos SDD+TDD completos: `feature_contract.md`, notebook, spec, plan, `state.json`, tests, código) | No implementada | 2026-07-12 | diseño ya acordado con el humano (ver `decisions.md` D-15/notas T-12); confirmado nombre/ubicación `610_features/client_scaffold/` y formato de `state.json` (sin campo `band`, con las 13 etapas del flujo); pendiente crear la carpeta del feature, la rama `feature/1` y ejecutar el flujo de 13 pasos; es la continuación de T-12 |
+| T-21 | Construir Tracer Bullet `client_scaffold` (artefactos SDD+TDD completos: `feature_contract.md`, notebook, spec, plan, `state.json`, tests, código) | No implementada | 2026-07-12 | pasos 1-9 del flujo completados en rama `feature/client_scaffold`: `feature_contract.md`, `definition.md` (8 HU), `client_scaffold.ipynb` (aprobado en gate, luego ajustado a `COMPANY_DEMO`), `spec.md` (10 CA, aprobado explícitamente en gate), `plan.md` (27 TSK, 13 casos, aprobado en gate), `state.json` (`current_stage="tdd"`); pendiente el bucle TDD (paso 10) y pasos 11-13 (`spec_verifier`, `human_test`, `merge_to_main`); es la continuación de T-12 |
+| T-22 | Bucle TDD del Tracer Bullet `client_scaffold`: ejecutar `tdd_tester`/`tdd_coder`/`tdd_refactor` sobre los 13 casos de `plan.md`/`state.json`, produciendo código en `app/src/zeroleak/core/scaffold.py` y tests en `app/tests/` | No implementada | 2026-07-12 | siguiente paso inmediato al retomar; empieza por el Caso 1 (nombres inválidos → `ClientNameError`) |

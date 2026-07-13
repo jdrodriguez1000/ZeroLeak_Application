@@ -1,0 +1,34 @@
+{
+  "feature": "client_scaffold",
+  "status": "in_progress",
+  "current_stage": "tdd",
+  "stages": {
+    "feature_contract":   { "status": "done", "artifact": "feature_contract.md", "owner": "main_session" },
+    "feature_definer":    { "status": "done", "artifact": "definition.md" },
+    "notebook_writer":    { "status": "done", "artifact": "client_scaffold.ipynb", "gate": "human", "awaiting_approval": false, "approved": true },
+    "spec_writer":        { "status": "done", "artifact": "spec.md",  "gate": "human", "awaiting_approval": false, "approved": true },
+    "plan_builder":       { "status": "done", "artifact": "plan.md",  "gate": "human", "awaiting_approval": false, "approved": true },
+    "tdd": {
+      "status": "pending",
+      "cases": [
+        { "id": 1,  "status": "pending", "ca": ["CA-04"], "tsk": ["TSK-02", "TSK-03"], "desc": "Nombres inválidos lanzan ClientNameError sin tocar disco." },
+        { "id": 2,  "status": "pending", "ca": ["CA-01"], "tsk": ["TSK-01", "TSK-04", "TSK-05", "TSK-09", "TSK-11"], "desc": "create_client sobre clients_root limpio retorna la ruta y crea la estructura canónica completa." },
+        { "id": 3,  "status": "pending", "ca": ["CA-05"], "tsk": ["TSK-06", "TSK-07"], "desc": "Nombres válidos (incl. acentos/ñ) crean el tenant; NAME_PATTERN es la allow-list exacta de la spec." },
+        { "id": 4,  "status": "pending", "ca": ["CA-07"], "tsk": ["TSK-08", "TSK-09"], "desc": "client.yaml y los 3 YAMLs de input/ son parseables, claves vacías + comentario guía, sin datos reales." },
+        { "id": 5,  "status": "pending", "ca": ["CA-08"], "tsk": ["TSK-10", "TSK-11"], "desc": "Medallion bronze/silver/gold vacías y manifest.json == {\"version\":1,\"files\":[]}." },
+        { "id": 6,  "status": "pending", "ca": ["CA-04"], "tsk": ["TSK-12", "TSK-14"], "desc": "Un nombre inválido no deja residuos (ni tenant parcial ni .staging)." },
+        { "id": 7,  "status": "pending", "ca": ["CA-04"], "tsk": ["TSK-13", "TSK-14"], "desc": "Un fallo de E/S a mitad se propaga sin dejar tenant parcial ni staging (atomicidad todo-o-nada)." },
+        { "id": 8,  "status": "pending", "ca": ["CA-06"], "tsk": ["TSK-15", "TSK-16"], "desc": "Un segundo create_client lanza TenantExistsError; el snapshot del tenant existente queda idéntico." },
+        { "id": 9,  "status": "pending", "ca": ["CA-02"], "tsk": ["TSK-17", "TSK-18"], "desc": "zlk client new produce la misma estructura que el core y reporta la ruta (delega en el core)." },
+        { "id": 10, "status": "pending", "ca": ["CA-02"], "tsk": ["TSK-19", "TSK-20"], "desc": "Exit codes distintos: 0 éxito, 2 nombre inválido, 3 tenant existente." },
+        { "id": 11, "status": "pending", "ca": ["CA-03"], "tsk": ["TSK-21", "TSK-18"], "desc": "create_client (import directo) produce un resultado en disco idéntico al de zlk client new." },
+        { "id": 12, "status": "pending", "ca": ["CA-09"], "tsk": ["TSK-22"], "desc": "La regla .gitignore clients/*/data/ cubre data/ y NO client.yaml ni input/." },
+        { "id": 13, "status": "pending", "ca": ["CA-10"], "tsk": ["TSK-23", "TSK-24"], "desc": "create_client(\"COMPANY_DEMO\", root) produce un conjunto de rutas relativas idéntico al de cualquier tenant real." }
+      ]
+    },
+    "integration_tester": { "status": "pending" },
+    "spec_verifier":      { "status": "pending", "artifact": "verification.md" },
+    "human_test":         { "status": "pending", "gate": "human" },
+    "merge_to_main":      { "status": "pending", "gate": "human" }
+  }
+}
