@@ -1,7 +1,7 @@
 {
   "feature": "client_scaffold",
   "status": "in_progress",
-  "current_stage": "tdd",
+  "current_stage": "human_test",
   "stages": {
     "feature_contract": {
       "status": "done",
@@ -198,11 +198,33 @@
       ]
     },
     "integration_tester": {
-      "status": "pending"
+      "status": "done",
+      "artifact": "app/tests/integration/test_client_new_e2e.py",
+      "ca": [
+        "CA-01",
+        "CA-02",
+        "CA-03",
+        "CA-06"
+      ],
+      "tsk": [
+        "TSK-25"
+      ],
+      "result": "pytest app/tests -v: 43 passed (39 previos del bucle TDD + 4 nuevos de integracion), 0 failed. Suite ejecutada con .venv/Scripts/python.exe (Python 3.13.7, requerido por pyproject requires-python>=3.13). No se hallaron fallos end-to-end; no se modifico app/src/zeroleak/... Cobertura: (1) exito subprocess crea estructura canonica completa + manifest + YAMLs parseables (CA-01, CA-07, CA-08); (2) nombre invalido via subprocess -> exit code 2, sin residuo en clients_root (CA-02, CA-04); (3) tenant existente via subprocess -> exit code 3, snapshot identico antes/despues (CA-02, CA-06); (4) arbol producido por el comando 'zlk' instalado (subprocess real, via [project.scripts] de pyproject.toml) es identico byte-a-byte al de create_client invocado en proceso (CA-02, CA-03). Fixtures 100% sinteticas en tmp_path (C-01); no se toco clients/ real ni datos de ningun cliente. CA-09 (frontera .gitignore) ya esta cubierta por tests unitarios existentes (test_scaffold.py) con rutas ficticias via git check-ignore, sin necesidad de residuo de integracion adicional."
     },
     "spec_verifier": {
-      "status": "pending",
-      "artifact": "verification.md"
+      "status": "done",
+      "artifact": "verification.md",
+      "verdict": "CONFORME",
+      "pytest_result": "43 passed, 0 failed (Python 3.13.7 via .venv/Scripts/python.exe)",
+      "ca_coverage": {
+        "cubierto": ["CA-01", "CA-02", "CA-03", "CA-04", "CA-05", "CA-06", "CA-07", "CA-08", "CA-09", "CA-10"],
+        "parcial": [],
+        "no_cubierto": []
+      },
+      "c01_datos_en_boveda": "cumplida",
+      "scope_check": "in_scope completo, out_of_scope respetado",
+      "return_stage": null,
+      "next_step": "paso 13 (PR) -> gate humano human_test + merge_to_main"
     },
     "human_test": {
       "status": "pending",
