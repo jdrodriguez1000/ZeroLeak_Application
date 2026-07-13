@@ -19,9 +19,9 @@ Dar de alta un cliente nuevo materializando en disco un **tenant** aislado (`cli
 |---|---|---|---|
 | produce | `<Path>` retornado | `pathlib.Path` | Ruta absoluta o relativa al tenant creado: `clients_root / name`. |
 | produce | `client.yaml` | YAML | Claves presentes con valores **vacíos** + comentarios guía: `client_id`, `display_name`, `sector_id`, `created_at`. Versionable. |
-| produce | `input/contrato_datos.yaml` | YAML | Claves presentes con valores vacíos + comentarios guía (Contrato de Datos, YAML 1). Versionable. |
-| produce | `input/reglas_negocio.yaml` | YAML | Claves presentes con valores vacíos + comentarios guía (Reglas de Negocio, YAML 2). Versionable. |
-| produce | `input/finanzas.yaml` | YAML | Claves presentes con valores vacíos + comentarios guía (Variables Financieras, YAML 3). Versionable. |
+| produce | `input/contract_data.yaml` | YAML | Claves presentes con valores vacíos + comentarios guía (Contrato de Datos, YAML 1). Versionable. |
+| produce | `input/business_rules.yaml` | YAML | Claves presentes con valores vacíos + comentarios guía (Reglas de Negocio, YAML 2). Versionable. |
+| produce | `input/finance.yaml` | YAML | Claves presentes con valores vacíos + comentarios guía (Variables Financieras, YAML 3). Versionable. |
 | produce | `data/bronze/` | directorio | Vacío. Cubierto por `.gitignore` (C-01). |
 | produce | `data/silver/` | directorio | Vacío. Cubierto por `.gitignore` (C-01). |
 | produce | `data/gold/` | directorio | Vacío. Cubierto por `.gitignore` (C-01). |
@@ -58,7 +58,7 @@ Dar de alta un cliente nuevo materializando en disco un **tenant** aislado (`cli
 
 3. **Atomicidad todo-o-nada.** La creación es transaccional: ante cualquier fallo (nombre inválido detectado tarde, error de E/S a mitad, etc.), el resultado observable es que **no queda ningún tenant a medias** ni carpeta residual (p. ej. `.staging`) en `clients_root`. Solo un alta que completa la estructura canónica íntegra deja artefactos; cualquier otra ejecución deja `clients_root` sin residuos nuevos.
 
-4. **Estructura canónica creada.** En un alta exitosa se materializan, bajo `clients_root/<name>/`: `client.yaml`; `input/` con `contrato_datos.yaml`, `reglas_negocio.yaml`, `finanzas.yaml`; `data/bronze/`, `data/silver/`, `data/gold/` (vacías); y `data/manifest.json` con `{"version": 1, "files": []}`. La función retorna la `Path` del tenant.
+4. **Estructura canónica creada.** En un alta exitosa se materializan, bajo `clients_root/<name>/`: `client.yaml`; `input/` con `contract_data.yaml`, `business_rules.yaml`, `finance.yaml`; `data/bronze/`, `data/silver/`, `data/gold/` (vacías); y `data/manifest.json` con `{"version": 1, "files": []}`. La función retorna la `Path` del tenant.
 
 5. **Placeholders YAML (decisión del gate).** `client.yaml` y los 3 YAMLs de `input/` se generan con **las claves presentes pero con valores vacíos**, acompañadas de **comentarios guía** (líneas `#` que orientan al humano que completará la config). Deben ser **sintácticamente válidos** (parseables por `yaml.safe_load` de PyYAML sin excepción) y **nunca** contener datos reales o sensibles.
 
@@ -100,7 +100,7 @@ Dar de alta un cliente nuevo materializando en disco un **tenant** aislado (`cli
 
 | ID | Criterio de aceptación (redactado como algo que un test puede comprobar) | Trazabilidad → HU |
 |---|---|---|
-| CA-01 | Sobre un `clients_root` limpio, `create_client("SANDUCHERIA", root)` retorna una `Path` igual a `root/"SANDUCHERIA"` y, tras la llamada, existen: `client.yaml`, `input/contrato_datos.yaml`, `input/reglas_negocio.yaml`, `input/finanzas.yaml`, `data/bronze/`, `data/silver/`, `data/gold/` y `data/manifest.json`. | HU-01 |
+| CA-01 | Sobre un `clients_root` limpio, `create_client("SANDUCHERIA", root)` retorna una `Path` igual a `root/"SANDUCHERIA"` y, tras la llamada, existen: `client.yaml`, `input/contract_data.yaml`, `input/business_rules.yaml`, `input/finance.yaml`, `data/bronze/`, `data/silver/`, `data/gold/` y `data/manifest.json`. | HU-01 |
 | CA-02 | `zlk client new SANDUCHERIA` (fachada) produce en disco exactamente la misma estructura que invocar `create_client` directamente, y reporta/imprime la ruta del tenant creado; la CLI no ejecuta lógica de negocio propia (delega en el core). | HU-01, HU-02 |
 | CA-03 | `create_client` es invocable sin la CLI (import directo) y produce el tenant completo; el resultado en disco es idéntico al obtenido vía `zlk client new`. | HU-02 |
 | CA-04 | Para cada nombre inválido del conjunto `{"", "   ", "cliente con espacios", "cli/ente", "cli\\ente", "../escape", "клиент", "cli😀", "x"*65}`, `create_client` lanza `ClientNameError` y `clients_root` no gana ningún artefacto nuevo (sin tenant parcial ni carpeta `.staging`). | HU-03 |

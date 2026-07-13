@@ -14,6 +14,8 @@ Registro de las lecciones aprendidas durante la ejecución del proyecto.
 - [L-06] Comparar `state.json` con el proyecto hermano FODA ayuda a detectar diferencias de esquema (campo `band`) antes de instanciar el primer feature.
 - [L-07] Editar notebooks `.ipynb` con contenido no-ASCII vía heredoc de bash en Windows/git-bash corrompe caracteres; usar scripts Python con escapes `\uXXXX` y verificar por codepoint + ejecución.
 - [L-08] El gate humano de la spec (paso 7) requiere aprobación explícita; no debe darse por superado de forma implícita.
+- [L-09] `pyproject.toml` exige Python 3.13+, pero el `python` del PATH del usuario es 3.12; usar `py -3.13` / `.venv` dedicado.
+- [L-10] En el bucle TDD, un caso puede pasar en verde de inmediato si su código ya quedó cubierto por un caso anterior; la verificación honesta consiste en provocar temporalmente el defecto y confirmar el fallo, revirtiendo sin dejar rastro.
 
 ---
 
@@ -56,3 +58,13 @@ Registro de las lecciones aprendidas durante la ejecución del proyecto.
 - **Situación:** Durante la construcción de `client_scaffold` (T-21), al llegar al paso 7 (gate humano sobre `spec.md`) el flujo avanzó dando por aprobada la spec de forma implícita, sin que el humano la aprobara explícitamente. El humano señaló el error y se corrigió, solicitando la aprobación explícita, que luego otorgó.
 - **Lección:** Los gates humanos del flujo de 13 pasos (paso 5 sobre el notebook, paso 7 sobre la spec, paso 9 sobre el plan, `human_test`) son puntos de control obligatorios que requieren una confirmación explícita del humano; no deben asumirse superados por defecto ni inferirse de la ausencia de objeciones.
 - **Acción futura:** En cada gate humano del flujo, solicitar y esperar una aprobación explícita antes de marcar la etapa correspondiente como `done` en `state.json` o de avanzar al siguiente paso.
+
+## [2026-07-13] L-09 — Desajuste de versión de Python entre `pyproject.toml` y el PATH del usuario
+- **Situación:** Al ejecutar TSK-24 (crear el tenant real `COMPANY_DEMO` instalando el paquete), `pip install -e .` falló porque `pyproject.toml` (en la raíz del repo) declara `requires-python = ">=3.13"`, mientras que el `python` resuelto por el PATH del usuario es la versión 3.12.10.
+- **Lección:** No asumir que el `python`/`pip` del PATH satisface el `requires-python` del proyecto; verificar la versión antes de instalar. En Windows, el selector `py -3.13` permite invocar una versión específica instalada sin depender del PATH.
+- **Acción futura:** Usar `py -3.13 -m venv .venv` en la raíz del repo y trabajar dentro de ese entorno (o invocar siempre `py -3.13`) para cualquier tarea que instale o ejecute el paquete `zeroleak`. `.venv/` ya está cubierto por `.gitignore`.
+
+## [2026-07-13] L-10 — Verificación honesta cuando un caso TDD pasa en verde de inmediato
+- **Situación:** En el bucle TDD de `client_scaffold`, varios casos (2-7, 11-13) tenían su código de producción ya cubierto desde el Caso 2 (que implementó la estructura completa del tenant), por lo que sus tests pasaban en verde apenas se escribían, sin una fase ROJA clásica.
+- **Lección:** Que un test pase de inmediato no basta como evidencia de que realmente ejercita el comportamiento esperado. En esos casos, `tdd_tester` provocó temporalmente el defecto correspondiente en el código de producción, confirmó que el test fallaba por la razón correcta, y revirtió el cambio dejando el diff limpio antes de continuar — una "verificación razonada honesta" que sustituye a la fase ROJA cuando esta no puede ocurrir de forma natural.
+- **Acción futura:** Aplicar esta técnica (romper temporalmente, confirmar el fallo, revertir sin rastro) cada vez que un test nuevo pase en verde sin haber tenido fase ROJA, antes de darlo por válido.
