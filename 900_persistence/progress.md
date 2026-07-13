@@ -16,11 +16,29 @@ Consultándolo siempre sabemos el estado y avance actual del proyecto.
 - [2026-07-12] T-21 en construcción: rama `feature/client_scaffold` creada; artefactos SDD generados hasta el paso 9 (`feature_contract.md`, `definition.md`, `client_scaffold.ipynb`, `spec.md`, `plan.md`, `state.json`), con dos gates humanos aprobados y ajustes del notebook a `COMPANY_DEMO`. Bucle TDD aún sin iniciar.
 - [2026-07-13] T-21 avanzada (paso 10 completo): bucle TDD cerrado (13/13 casos `refactored`), código de producción en `app/src/zeroleak/core/scaffold.py` y `app/src/zeroleak/cli.py`, suite completa 39 passed; renombrados a inglés los 3 YAML de `input/` (`contract_data.yaml`, `business_rules.yaml`, `finance.yaml`); creado el tenant real `COMPANY_DEMO` (TSK-24) por la vía oficial; entorno `.venv/` con Python 3.13 configurado en la raíz del repo.
 - [2026-07-13] Tracer Bullet `client_scaffold` **CERRADO (pasos 11-13):** integración e2e (TSK-25) contra `zlk client new` por subprocess (suite 43 passed, cubre CA-01..CA-08); `spec_verifier` auditó los 10 CA con veredicto CONFORME (`610_features/client_scaffold/verification.md`); el humano aprobó y mergeó el PR #1 a `main`. Actualizado `README.md` con secciones "Entorno de desarrollo" y "Uso del CLI". Decidida la siguiente feature del segundo Tracer Bullet: `ingest` (D-17, T-26).
+- [2026-07-13] T-28 (Tracer Bullet `ingest`) iniciado: rama `feature/ingest` creada desde `main`, carpeta `610_features/ingest/` creada, paso 2 del flujo completado con `feature_contract.md` escrito por la sesión principal (materializa D-17, deja D-18 fuera de alcance). Paso 3 (`feature_definer`) pendiente.
 
 ---
 
 ## Estado actual
-El proyecto **ZeroLeak** **cerró su primer Tracer Bullet, `client_scaffold` (T-21)**, con los 13 pasos del
+El proyecto **ZeroLeak** está construyendo su **segundo Tracer Bullet, `ingest` (T-28)**, sobre la rama
+`feature/ingest` (creada desde `main`, que ya contiene el primer Tracer Bullet `client_scaffold` mergeado
+vía PR #1). Del flujo de 13 pasos, el **paso 2 está completo**: se creó la carpeta `610_features/ingest/`
+y la sesión principal escribió `feature_contract.md`, materializando el alcance acordado en D-17 (comando
+`zlk ingest <CLIENTE> <ruta>...` con uno o varios argumentos de archivo o carpeta con recorrido plano sin
+recursión; copia inmutable a `clients/<CLIENTE>/data/bronze/`; hash `sha256`; entrada en `manifest.json`
+con status `pending`; dedupe por `sha256` que habilita el Modo Incremental; principio "archivador
+notarial" — no parsea contenido; validación básica agnóstica de formato: tenant existe, archivo existe y
+no está vacío, extensión en allow-list; allow-list MVP `.csv`/`.xlsx` únicamente; 6 criterios de aceptación
+a nivel feature) y dejando explícitamente fuera D-18 (emparejamiento archivo físico → tipo de contrato,
+punto abierto para la futura feature de Contrato de Datos/`load_config`). El **próximo paso pendiente es
+el paso 3**: invocar al agente `feature_definer` para producir `610_features/ingest/definition.md` con las
+historias de usuario (HU-xx); el humano aún no decidió si revisa primero el `feature_contract.md` o lanza
+directo el `feature_definer`. El `feature_contract.md` quedó sin versionar en el working tree al cierre de
+esta sesión; se sube en el commit de cierre. La carpeta `clients/MI_BUNUELO/` sigue siendo un tenant de
+prueba manual del humano, sin versionar.
+
+El proyecto **cerró su primer Tracer Bullet, `client_scaffold` (T-21)**, con los 13 pasos del
 flujo completos: `feature/client_scaffold` fue mergeada a `main` vía PR #1, aprobado y mergeado por el
 humano (paso 13). La rama local `main` ya está sincronizada (`git pull` ff-only) y contiene el comando
 `zlk client new` funcional, verificado por integración (43 passed) y auditado como CONFORME por
@@ -133,9 +151,10 @@ el feature `client_scaffold` en `610_features/client_scaffold/` (código en
 - **[2026-07-13]** **T-21 CERRADA (pasos 11-13, cierre del Tracer Bullet `client_scaffold`):** Paso 11 (TSK-25): `integration_tester` creó `app/tests/integration/test_client_new_e2e.py`, ejecutando `zlk client new` por subprocess dentro del `.venv` (Python 3.13); suite total **43 passed**, cubre CA-01..CA-08. Paso 12: `spec_verifier` auditó con mentalidad crítica los 10 CA contra la spec, con evidencia real de ejecución; C-01 "Datos en Bóveda" verificada; veredicto **CONFORME**; se creó `610_features/client_scaffold/verification.md`. Paso 13: el humano aprobó y **mergeó el PR #1** (`feature/client_scaffold` → `main`) en GitHub; `main` local sincronizado con `git pull` ff-only.
 - **[2026-07-13]** **Actualizado `README.md`** (en `main`, tras el merge): agregada sección "Entorno de desarrollo" (crear/activar `.venv` con `py -3.13`, instalar con `pip install -e ".[dev]"`, correr tests) y sección "Uso del CLI" (comando `zlk client new`, patrón de nombres, tabla de exit codes 0/1/2/3); corregida la nota obsoleta que indicaba que `zlk client new` estaba "aún no implementada".
 - **[2026-07-13]** **Decidido el alcance del segundo Tracer Bullet, `ingest` (D-17):** comando para registrar archivos del cliente en la capa bronze del tenant (copia fiel/inmutable a `clients/<CLIENTE>/data/bronze/`, hash `sha256`, entrada en `manifest.json` con status `pending`); dedupe por `sha256` (habilita Modo Incremental §10); principio "archivador notarial" — `ingest` no parsea contenido, el delimitador/estructura es problema del Contrato de Datos (YAML 1) en etapa posterior; validación agnóstica de formato (tenant existe, archivo no vacío, extensión en allow-list); allow-list MVP `.csv`/`.xlsx` únicamente, `.txt` explícitamente fuera; entrada por archivo o carpeta con recorrido plano (sin recursión), preferido sobre glob por inconsistencias de shell en PowerShell. Sin artefactos creados aún (T-26, `No implementada`).
+- **[2026-07-13]** **T-28 avanzada (pasos 1-2 del flujo, Tracer Bullet `ingest`):** creada la rama `feature/ingest` desde `main`; creada la carpeta `610_features/ingest/`; la sesión principal escribió `feature_contract.md` materializando D-17 (comando `zlk ingest <CLIENTE> <ruta>...`, uno o varios argumentos de archivo/carpeta con recorrido plano, copia inmutable a bronze, `sha256`, entrada `manifest.json` status `pending`, dedupe habilita Modo Incremental, principio "archivador notarial", validación básica agnóstica de formato, allow-list MVP `.csv`/`.xlsx`, 6 criterios de aceptación a nivel feature) y dejando D-18 explícitamente fuera de alcance. Paso 3 (`feature_definer` → `definition.md`) queda pendiente para la próxima sesión.
 
 ## Lo próximo a realizar
-- **Prioridad inmediata:** iniciar el flujo de 13 pasos para el segundo Tracer Bullet, **`ingest`** (T-26): crear rama `feature/ingest`, carpeta `610_features/ingest/` y `feature_contract.md`, definiendo la firma exacta del comando (`zlk ingest <CLIENTE> <ruta>`) y qué metadatos del manifest se llenan en esta etapa vs. después (period, run_id probablemente vacíos hasta el procesamiento posterior).
+- **Prioridad inmediata:** continuar el flujo de 13 pasos para el segundo Tracer Bullet, **`ingest`** (T-28), con el **paso 3**: invocar al agente `feature_definer` para producir `610_features/ingest/definition.md` con las historias de usuario (HU-xx), a partir del `feature_contract.md` ya escrito. Pendiente que el humano decida si revisa primero el contrato o lanza directo el `feature_definer`.
 - (Menor) Terminar de verificar el registro completo de los agentes `.claude/agents/*.md` como subagentes tras reiniciar Claude Code (T-13); confirmar que persistan entre sesiones/reinicios.
 - (Menor) Evaluar si se desean colores distintos para los agentes que hoy comparten color (ver nota en `lessons.md` L-04).
 - (Nota) `clients/MI_BUNUELO/` es un tenant de prueba manual del humano (no es entregable); queda sin versionar en el working tree.
