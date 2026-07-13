@@ -1,0 +1,238 @@
+{
+  "feature": "client_scaffold",
+  "status": "in_progress",
+  "current_stage": "human_test",
+  "stages": {
+    "feature_contract": {
+      "status": "done",
+      "artifact": "feature_contract.md",
+      "owner": "main_session"
+    },
+    "feature_definer": {
+      "status": "done",
+      "artifact": "definition.md"
+    },
+    "notebook_writer": {
+      "status": "done",
+      "artifact": "client_scaffold.ipynb",
+      "gate": "human",
+      "awaiting_approval": false,
+      "approved": true
+    },
+    "spec_writer": {
+      "status": "done",
+      "artifact": "spec.md",
+      "gate": "human",
+      "awaiting_approval": false,
+      "approved": true
+    },
+    "plan_builder": {
+      "status": "done",
+      "artifact": "plan.md",
+      "gate": "human",
+      "awaiting_approval": false,
+      "approved": true
+    },
+    "tdd": {
+      "status": "done",
+      "cases": [
+        {
+          "id": 1,
+          "status": "refactored",
+          "ca": [
+            "CA-04"
+          ],
+          "tsk": [
+            "TSK-02",
+            "TSK-03"
+          ],
+          "desc": "Nombres inválidos lanzan ClientNameError sin tocar disco."
+        },
+        {
+          "id": 2,
+          "status": "refactored",
+          "ca": [
+            "CA-01"
+          ],
+          "tsk": [
+            "TSK-01",
+            "TSK-04",
+            "TSK-05",
+            "TSK-09",
+            "TSK-11"
+          ],
+          "desc": "create_client sobre clients_root limpio retorna la ruta y crea la estructura canónica completa."
+        },
+        {
+          "id": 3,
+          "status": "refactored",
+          "ca": [
+            "CA-05"
+          ],
+          "tsk": [
+            "TSK-06",
+            "TSK-07"
+          ],
+          "desc": "Nombres válidos (incl. acentos/ñ) crean el tenant; NAME_PATTERN es la allow-list exacta de la spec. Nota: test escrito por tdd_tester (TSK-06) pasa de inmediato (verde) porque NAME_PATTERN/create_client ya fueron implementados en scaffold.py durante el Caso 2 (TSK-05); no hubo fase roja clásica. tdd_coder (paso 10, GREEN) verificó TSK-07. REFACTOR: sin cambios de código (no hubo escritura nueva que limpiar); suite completa en verde."
+        },
+        {
+          "id": 4,
+          "status": "refactored",
+          "ca": [
+            "CA-07"
+          ],
+          "tsk": [
+            "TSK-08",
+            "TSK-09"
+          ],
+          "desc": "client.yaml y los 3 YAMLs de input/ son parseables, claves vacías + comentario guía, sin datos reales. Nota: el test escrito por tdd_tester (TSK-08) pasó de inmediato (verde) porque TSK-09 ya implementó los placeholders YAML en scaffold.py durante el Caso 2; no hubo fase roja clásica. Verificación razonada: se rompió temporalmente _CLIENT_YAML en scaffold.py, se confirmó el fallo por AssertionError, y se revirtió (suite verde, 22 passed). tdd_coder (GREEN) confirmó TSK-09 y codepoints intactos. REFACTOR: sin cambios de código (no hubo escritura nueva que limpiar); suite completa en verde."
+        },
+        {
+          "id": 5,
+          "status": "refactored",
+          "ca": [
+            "CA-08"
+          ],
+          "tsk": [
+            "TSK-10",
+            "TSK-11"
+          ],
+          "desc": "Medallion bronze/silver/gold vacías y manifest.json == {\"version\":1,\"files\":[]}. Nota: el grupo de tests 'medallion-manifest' escrito por tdd_tester (TSK-10) pasa de inmediato (verde) porque TSK-11 ya implementó data/{bronze,silver,gold} y manifest.json en scaffold.py durante el Caso 2; no hubo fase roja clásica. Verificación razonada: se rompió temporalmente _MANIFEST_JSON y se dejó un '.gitkeep' residual -> AssertionError esperado; revertido, scaffold.py idéntico (git diff limpio), suite 26 passed. tdd_coder (GREEN) confirmó TSK-11 (minimal-suficiente). REFACTOR: sin cambios de código; suite completa en verde."
+        },
+        {
+          "id": 6,
+          "status": "refactored",
+          "ca": [
+            "CA-04"
+          ],
+          "tsk": [
+            "TSK-12",
+            "TSK-14"
+          ],
+          "desc": "REFACTOR: sin cambios de codigo (no hubo escritura nueva que limpiar); suite en verde. Un nombre inválido no deja residuos (ni tenant parcial ni .staging). TSK-12 (tdd_tester) escrito: test parametrizado 'sin-residuo-nombre-invalido' en test_scaffold.py (nombres 'cli/ente', '../escape'), asertando clients_root vacio y sin '.staging-*'. Nota: pasa de inmediato (verde) porque la validacion de nombre ya ocurre antes de tocar disco (staging+rename ya implementado en scaffold.py desde el Caso 2/TSK-05); no hay fase roja clasica sobre el codigo actual. Verificacion razonada: se inserto temporalmente una linea que crea '.staging-verif-temporal' ANTES de validar el nombre -> el test detecto el residuo y fallo (AssertionError) como se esperaba; se revirtio el cambio (git diff limpio en scaffold.py). Suite completa: 28 passed. TSK-14 (tdd_coder, GREEN): verificado que scaffold.py ya cumple el contrato completo (staging dentro de clients_root, validacion de nombre antes de crear staging, limpieza en except); sin cambios de codigo (minimo suficiente). Suite: 29 passed."
+        },
+        {
+          "id": 7,
+          "status": "refactored",
+          "ca": [
+            "CA-04"
+          ],
+          "tsk": [
+            "TSK-13",
+            "TSK-14"
+          ],
+          "desc": "REFACTOR: sin cambios de codigo (no hubo escritura nueva que limpiar); suite en verde. Un fallo de E/S a mitad se propaga sin dejar tenant parcial ni staging (atomicidad todo-o-nada). TSK-13 (tdd_tester) escrito: test 'test_create_client_fallo_io_a_mitad_no_deja_residuo' en test_scaffold.py, monkeypatch de pathlib.Path.write_text (raises OSError) para forzar el fallo DESPUES de que _build_tenant_tree ya creo los subdirectorios de staging (input/, data/bronze|silver|gold) y ANTES de escribir los archivos de texto; asi el '.staging-<uuid>' ya existe en disco cuando salta la excepcion. Asserta pytest.raises(OSError) y clients_root vacio (sin tenant ni '.staging-*'). Nota: pasa de inmediato (verde) porque el mecanismo staging+rename+except/rmtree ya fue implementado en scaffold.py desde el Caso 2 (TSK-05); no hay fase roja clasica sobre el codigo actual. Verificacion razonada honesta: se comento temporalmente la linea 'shutil.rmtree(staging_dir, ignore_errors=True)' en el except de create_client -> el test detecto el '.staging-*' residual y fallo con AssertionError como se esperaba; se revirtio el cambio (git diff --stat sin salida, scaffold.py identico). Suite completa: 29 passed. TSK-14 (tdd_coder, GREEN): confirmado que el bloque try/except con shutil.rmtree ya satisface el contrato de atomicidad; sin cambios de codigo (minimo suficiente). Suite: 29 passed."
+        },
+        {
+          "id": 8,
+          "status": "refactored",
+          "ca": [
+            "CA-06"
+          ],
+          "tsk": [
+            "TSK-15",
+            "TSK-16"
+          ],
+          "desc": "Un segundo create_client lanza TenantExistsError; el snapshot del tenant existente queda idéntico. TSK-15 (tdd_tester) escrito: test 'test_create_client_tenant_existente_lanza_tenant_exists_error_y_no_lo_modifica' en test_scaffold.py; crea SANDUCHERIA, toma snapshot con tenant_snapshot, reintenta create_client con pytest.raises(TenantExistsError), compara snapshot antes/despues y verifica ausencia de '.staging-*'. RED confirmado: create_client aun no tiene la guarda de no idempotencia (TSK-16 pendiente); el segundo os.replace(staging_dir, tenant_dir) sobre un destino ya existente falla en Windows con PermissionError: [WinError 5] Acceso denegado (no con TenantExistsError), por lo que pytest.raises(TenantExistsError) no captura la excepcion real y el test falla como se esperaba. Suite completa: 29 passed, 1 failed (el nuevo test rojo); los 29 tests previos siguen verdes. TSK-16 (tdd_coder, GREEN): guarda de no idempotencia agregada en create_client (scaffold.py) -- tras validar el nombre y ANTES de crear el staging, si clients_root/name ya existe se lanza TenantExistsError directamente, sin construir '.staging-*' ni tocar el tenant existente (asi no hay residuo que limpiar en ese camino y el except de limpieza no enmascara el error de dominio). os.replace se mantiene como red de seguridad para condiciones de carrera. Suite completa: 30 passed, 0 failed. REFACTOR (tdd_refactor): revisado scaffold.py completo; el orden validacion(nombre)->existencia(TenantExistsError)->construccion(staging)->promocion(os.replace) ya es claro, la guarda de 3 lineas (TSK-16) es minima y su intencion esta documentada en el docstring de create_client (incluye referencia a CA-06). TSK-26 (extraccion de plantillas YAML/manifest a constantes cohesivas, _EMPTY_DIRS/_TEXT_FILES) ya estaba implementada de una pasada de refactor previa. No se identifico duplicacion, nombres confusos ni complejidad accidental que amerite cambios adicionales; aplicar mas abstraccion seria especulativo (viola E4/NC-2). Decision: sin cambios de codigo. Suite completa verificada de nuevo: 30 passed, 0 failed."
+        },
+        {
+          "id": 9,
+          "status": "refactored",
+          "ca": [
+            "CA-02"
+          ],
+          "tsk": [
+            "TSK-17",
+            "TSK-18"
+          ],
+          "desc": "zlk client new produce la misma estructura que el core y reporta la ruta (delega en el core). TSK-17 (tdd_tester) escrito: test 'test_cli_client_new_crea_estructura_y_reporta_ruta' en app/tests/test_cli_client_new.py. Contrato fijado para TSK-18 (tdd_coder): `zeroleak.cli.main(argv: list[str] | None = None) -> int`; convencion de clients_root = variable de entorno ZEROLEAK_CLIENTS_ROOT (leida por la CLI, apuntando a un Path). En exito retorna 0 e imprime por stdout una linea que contiene la ruta del tenant creado; delega en create_client (arbol identico al del core). RED confirmado: main() aun es el placeholder sin parametros (`def main() -> None`) y hace SystemExit con el mensaje placeholder; al invocar `main(['client','new','SANDUCHERIA'])` el test falla con `TypeError: main() takes 0 positional arguments but 1 was given`. Suite completa: 30 passed, 1 failed (el nuevo test rojo); los 30 tests previos siguen verdes. TSK-18 (tdd_coder, GREEN): reescrito `cli.py` con `main(argv: list[str] | None = None) -> int`; si `argv` es None usa `sys.argv[1:]`; `_clients_root()` lee `ZEROLEAK_CLIENTS_ROOT` (fallback './clients' si no esta definida, no ejercido por el test actual); para `['client','new',NOMBRE]` delega en `create_client(name, clients_root)`, imprime `tenant_path` por stdout y retorna 0 (sin logica de negocio propia). No se implemento traduccion de excepciones a exit codes 2/3 (alcance del Caso 10/TSK-20); cualquier invocacion no reconocida retorna 1 por defecto (reservado por el plan para errores no de dominio). Suite completa: 31 passed, 0 failed. REFACTOR (tdd_refactor): revisado cli.py (42 lineas, sin duplicacion, docstrings claros, responsabilidad unica por funcion). Decision: DIFERIR TSK-27 (refactor de cli.py) hasta despues del Caso 10 -- el Caso 10 (TSK-19/TSK-20) va a envolver la llamada a create_client en try/except para traducir ClientNameError->2 y TenantExistsError->3, reestructurando el cuerpo de main(); separar parseo/despacho/traduccion de errores ahora seria refactorizar una forma que todavia no existe (trabajo especulativo que se rehace en el proximo caso). Sin cambios de codigo. Suite completa reverificada: 31 passed, 0 failed."
+        },
+        {
+          "id": 10,
+          "status": "refactored",
+          "ca": [
+            "CA-02"
+          ],
+          "tsk": [
+            "TSK-19",
+            "TSK-20",
+            "TSK-27"
+          ],
+          "desc": "Exit codes distintos: 0 éxito, 2 nombre inválido, 3 tenant existente. TSK-19 (tdd_tester) escrito: test 'test_cli_client_new_exit_codes_distintos' en app/tests/test_cli_client_new.py. Contrato fijado para TSK-20 (tdd_coder): main() debe envolver la llamada a create_client en try/except, capturando ClientNameError -> return 2 y TenantExistsError -> return 3, imprimiendo un mensaje claro por stderr en ambos casos (sin propagar la excepcion cruda); el camino de exito (return 0, ruta impresa por stdout) no cambia. RED confirmado: al invocar main(['client','new','cli/ente']) sobre un ZEROLEAK_CLIENTS_ROOT en tmp_path, cli.py aun no captura ClientNameError (no hay try/except en main), por lo que la excepcion de dominio se propaga cruda hasta pytest en vez de retornar 2; el test falla con 'zeroleak.core.scaffold.ClientNameError: Nombre de cliente invalido' (no con un AssertionError sobre el exit code, que es la razon correcta de fallo esperada en este punto del bucle). Suite completa: 31 passed, 1 failed (el nuevo test rojo); los 31 tests previos siguen verdes. TSK-20 (tdd_coder, GREEN): cli.py ahora importa ClientNameError y TenantExistsError desde zeroleak.core.scaffold; la rama 'client new' envuelve create_client en try/except -- ClientNameError imprime str(exc) por stderr y retorna 2, TenantExistsError imprime str(exc) por stderr y retorna 3; el camino de exito (stdout + return 0) queda intacto. Sin logica adicional (minimo suficiente). Suite completa: 32 passed, 0 failed. REFACTOR (tdd_refactor, TSK-27): cli.py separado en unidades cohesivas -- _parse_client_new_name(argv) (parseo puro, retorna el nombre o None), _dispatch_client_new(name) (despacho + traduccion de excepciones a exit codes, con el try/except ya existente), main() (orquesta: resuelve argv, parsea, despacha o imprime uso). Constante _USAGE extraida para evitar duplicar el mensaje. Mismo comportamiento observable: mismos exit codes (0/1/2/3), mismos mensajes por stdout/stderr, misma resolucion de clients_root via _clients_root() (sin tocar). No se modificaron los tests. Suite completa reverificada: 32 passed, 0 failed."
+        },
+        {
+          "id": 11,
+          "status": "refactored",
+          "ca": [
+            "CA-03"
+          ],
+          "tsk": [
+            "TSK-21",
+            "TSK-18"
+          ],
+          "desc": "create_client (import directo) produce un resultado en disco idéntico al de zlk client new. TSK-21 (tdd_tester) escrito: test 'test_create_client_import_directo_y_cli_producen_arbol_identico' en app/tests/test_cli_client_new.py; crea dos clients_root gemelos en tmp_path (root_core, root_cli), da de alta SANDUCHERIA por import directo (create_client) y por la fachada (main con ZEROLEAK_CLIENTS_ROOT=root_cli), y asserta que ambos arboles tienen el mismo conjunto de rutas relativas (tenant_snapshot) Y el mismo contenido byte-a-byte de cada archivo (read_bytes). Nota honesta: el test pasa de inmediato (verde) porque cli.py ya delega en create_client sin logica propia desde el Caso 9/10 (TSK-18/TSK-20/TSK-27); no hay fase roja clasica sobre el codigo actual. Verificacion razonada: se inserto temporalmente en cli.py (_dispatch_client_new) una escritura adicional que sobreescribia client.yaml con contenido divergente tras la llamada a create_client -> el test detecto la divergencia y fallo con AssertionError 'Contenido divergente en client.yaml entre core y CLI' como se esperaba; se revirtio el cambio (git diff limpio, cli.py identico al estado previo). Suite completa: 33 passed, 0 failed (32 tests previos + el nuevo). TSK-18 (tdd_coder, GREEN): revisada la fachada cli.py completa (main, _dispatch_client_new, _parse_client_new_name, _clients_root) -- ninguna funcion contiene logica de construccion en disco propia; toda escritura de archivos/directorios proviene exclusivamente de create_client (core), la CLI solo resuelve clients_root desde ZEROLEAK_CLIENTS_ROOT, delega, imprime la ruta por stdout y traduce ClientNameError/TenantExistsError a exit codes 2/3 por stderr. La equivalencia core<->CLI (CA-03) queda satisfecha por construccion; sin cambios de codigo (minimo suficiente, E4/NC-2). Suite completa reverificada: 33 passed, 0 failed. REFACTOR: sin cambios de codigo (no hubo escritura nueva); suite en verde (33 passed)."
+        },
+        {
+          "id": 12,
+          "status": "refactored",
+          "ca": [
+            "CA-09"
+          ],
+          "tsk": [
+            "TSK-22"
+          ],
+          "desc": "La regla .gitignore clients/*/data/ cubre data/ y NO client.yaml ni input/. TSK-22 (tdd_tester) escrito: grupo de tests 'gitignore-frontera-pii' en app/tests/test_scaffold.py (test_gitignore_cubre_data_del_tenant parametrizado sobre clients/DEMO_X/data/, clients/DEMO_X/data/bronze/archivo.parquet, clients/DEMO_X/data/manifest.json; test_gitignore_no_cubre_client_yaml_ni_input parametrizado sobre clients/DEMO_X/client.yaml, clients/DEMO_X/input/contract_data.yaml). Usa git check-ignore -v por subprocess, cwd en la raiz del repo (git rev-parse --show-toplevel), sobre rutas relativas ficticias que NO se crean en disco (no ensucia clients/ real, C-01). Nota honesta: los 5 tests pasan de inmediato (verde) porque la regla '.gitignore' clients/*/data/ ya esta vigente en el repo desde antes de este caso (Enfoque Tecnico del plan: 'verificar, sin cambio de codigo'); no hay fase roja clasica sobre codigo de produccion (no se toca scaffold.py). Verificacion razonada honesta: se amplio temporalmente la regla en .gitignore de 'clients/*/data/' a 'clients/*/' (ignorando todo el tenant, incl. client.yaml e input/) -> los 2 tests de 'no cubre' fallaron con AssertionError como se esperaba (client.yaml e input/contract_data.yaml pasaron a estar ignorados); se revirtio el cambio (git diff --stat sin salida, .gitignore identico). Suite completa: 38 passed, 0 failed (33 previos + 5 nuevos). Siguiente eslabon: tdd_coder (fase GREEN) confirma que no se requiere cambio de codigo en .gitignore (ya vigente). GREEN/REFACTOR: caso de verificacion pura (el plan indica .gitignore ya vigente, sin cambio de codigo); no hay produccion que escribir ni refactorizar. Suite: 38 passed."
+        },
+        {
+          "id": 13,
+          "status": "refactored",
+          "ca": [
+            "CA-10"
+          ],
+          "tsk": [
+            "TSK-23",
+            "TSK-24"
+          ],
+          "desc": "create_client(\"COMPANY_DEMO\", root) produce un conjunto de rutas relativas idéntico al de cualquier tenant real. TSK-23 (tdd_tester) escrito: test 'test_create_client_company_demo_produce_andamiaje_identico_a_tenant_real' en app/tests/test_scaffold.py; crea dos clients_root gemelos en tmp_path, da de alta COMPANY_DEMO y SANDUCHERIA por la misma via (create_client), y compara con tenant_snapshot el conjunto de rutas RELATIVAS A LA CARPETA DEL TENANT (no a clients_root) para que el nombre no contamine la comparacion; ademas compara contenido byte a byte de cada archivo de texto entre ambos tenants. Nota honesta: el test pasa de inmediato (verde) porque create_client ya es agnostico al nombre (mas alla de la validacion NAME_PATTERN) desde el Caso 2 (TSK-05); no hay fase roja clasica sobre el codigo actual. Verificacion razonada honesta: se inserto temporalmente en create_client (scaffold.py) una rama especial 'if name == \"COMPANY_DEMO\": (staging_dir / \"DEMO_MARKER.txt\").write_text(...)' que anadia un archivo extra solo para COMPANY_DEMO -> el test detecto la divergencia de rutas relativas y fallo con AssertionError ('COMPANY_DEMO no produjo el mismo conjunto de rutas relativas...') como se esperaba; se revirtio el cambio (git diff --stat sin salida, scaffold.py identico al estado previo). Suite completa: 39 passed, 0 failed (38 previos + el nuevo). Siguiente eslabon: tdd_coder (fase GREEN) confirma que no se requiere cambio de codigo en scaffold.py (create_client ya es agnostico al nombre por construccion). TSK-24 (humano) queda pendiente: crear/versionar el tenant COMPANY_DEMO real en clients/ ejecutando 'zlk client new COMPANY_DEMO' (fuera del alcance de tdd_tester). GREEN: create_client ya es agnostico al nombre (sin rama especial COMPANY_DEMO); sin cambio de codigo. Suite: 39 passed. PENDIENTE TSK-24 (humano): crear y versionar el tenant real clients/COMPANY_DEMO (client.yaml + input/), data/ gitignored. TSK-24 (humano, ejecutada con asistencia): instalado el paquete con py -3.13 (requires-python>=3.13; python del PATH era 3.12), creado clients/COMPANY_DEMO por la via oficial (zeroleak.cli:main, ZEROLEAK_CLIENTS_ROOT=clients), verificada estructura canonica y frontera .gitignore (data/ ignored !!, resto untracked), y stageados client.yaml + 3 input YAMLs (data/ excluido). Commit diferido al session-closer. Suite: 39 passed en 3.13."
+        }
+      ]
+    },
+    "integration_tester": {
+      "status": "done",
+      "artifact": "app/tests/integration/test_client_new_e2e.py",
+      "ca": [
+        "CA-01",
+        "CA-02",
+        "CA-03",
+        "CA-06"
+      ],
+      "tsk": [
+        "TSK-25"
+      ],
+      "result": "pytest app/tests -v: 43 passed (39 previos del bucle TDD + 4 nuevos de integracion), 0 failed. Suite ejecutada con .venv/Scripts/python.exe (Python 3.13.7, requerido por pyproject requires-python>=3.13). No se hallaron fallos end-to-end; no se modifico app/src/zeroleak/... Cobertura: (1) exito subprocess crea estructura canonica completa + manifest + YAMLs parseables (CA-01, CA-07, CA-08); (2) nombre invalido via subprocess -> exit code 2, sin residuo en clients_root (CA-02, CA-04); (3) tenant existente via subprocess -> exit code 3, snapshot identico antes/despues (CA-02, CA-06); (4) arbol producido por el comando 'zlk' instalado (subprocess real, via [project.scripts] de pyproject.toml) es identico byte-a-byte al de create_client invocado en proceso (CA-02, CA-03). Fixtures 100% sinteticas en tmp_path (C-01); no se toco clients/ real ni datos de ningun cliente. CA-09 (frontera .gitignore) ya esta cubierta por tests unitarios existentes (test_scaffold.py) con rutas ficticias via git check-ignore, sin necesidad de residuo de integracion adicional."
+    },
+    "spec_verifier": {
+      "status": "done",
+      "artifact": "verification.md",
+      "verdict": "CONFORME",
+      "pytest_result": "43 passed, 0 failed (Python 3.13.7 via .venv/Scripts/python.exe)",
+      "ca_coverage": {
+        "cubierto": ["CA-01", "CA-02", "CA-03", "CA-04", "CA-05", "CA-06", "CA-07", "CA-08", "CA-09", "CA-10"],
+        "parcial": [],
+        "no_cubierto": []
+      },
+      "c01_datos_en_boveda": "cumplida",
+      "scope_check": "in_scope completo, out_of_scope respetado",
+      "return_stage": null,
+      "next_step": "paso 13 (PR) -> gate humano human_test + merge_to_main"
+    },
+    "human_test": {
+      "status": "pending",
+      "gate": "human"
+    },
+    "merge_to_main": {
+      "status": "pending",
+      "gate": "human"
+    }
+  }
+}

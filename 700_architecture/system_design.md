@@ -281,7 +281,7 @@ ZeroLeak_Application/
 │       ├── input/                 # YAMLs 1–3 del cliente (config)         [versionable]
 │       │   ├── contrato_*.yaml    #   YAML 1: Contrato de Datos (por archivo)
 │       │   ├── reglas_*.yaml      #   YAML 2: Reglas de Negocio
-│       │   └── finanzas.yaml      #   YAML 3: Variables Financieras
+│       │   └── finance.yaml      #   YAML 3: Variables Financieras
 │       └── data/                  # 🔒 datos reales — EN .gitignore + excluido de IA (C-01)
 │           ├── bronze/            #   🥉 originales inmutables (con PII), tal cual llegan
 │           ├── silver/            #   🥈 binarizado Drop & Detach (banderas 1/0, SIN PII)
