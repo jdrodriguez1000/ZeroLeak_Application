@@ -13,6 +13,10 @@ Desktop.ini
 tmp/
 temp/
 
+# Archivos sintéticos para pruebas manuales de `zlk ingest` (temporal, se
+# borran al terminar las pruebas del PR #2). No son datos reales de cliente.
+Data_test/
+
 # Entornos / secretos
 .env
 .env.*
