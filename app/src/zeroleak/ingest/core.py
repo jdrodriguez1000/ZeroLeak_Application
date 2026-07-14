@@ -2,29 +2,21 @@
 
 Implementa `ingest_paths`, que registra en la capa bronze del tenant los
 archivos entregados por el cliente. Ver `610_features/ingest/spec.md`
-(CA-01 a CA-12) para el contrato completo.
+(CA-01 a CA-12) para el contrato completo; este módulo cubre CA-01 a CA-10
+(la fachada CLI, CA-12, y la frontera `.gitignore`, CA-11, no viven aquí).
 
-TSK-03 (Caso 1, CA-08): precondición global de tenant (verificación de
-`data/bronze/` + `data/manifest.json`) y la excepción `TenantNotFoundError`.
-
-TSK-05 (Caso 2, CA-01): camino feliz de `ingest_paths` — cada `path` de
-`paths` es tratado como un archivo válido: se calcula su `sha256`, se copia
-byte a byte a `data/bronze/<file>` y se agrega una entrada `pending` al
-`manifest.json` (una sola escritura al final).
-
-TSK-09 (Caso 4, CA-09): validación de archivo vacío — antes de copiar, se
-descarta cualquier `path` de 0 bytes, reportándolo en `result.failed` con el
-motivo `REASON_EMPTY_FILE`. El resto de la validación (existencia de ruta,
-extensión fuera de allow-list), colisión de nombre, carpetas y
-procesamiento parcial se implementa en casos posteriores del bucle TDD.
-
-TSK-11 (Caso 5, CA-05): dedupe por `sha256` (idempotencia). Antes de copiar
-un `path` válido, se compara su `sha256` (calculado por `_hash_file`)
-contra los ya presentes en el manifest en memoria (que incluye tanto el
-ledger previo cargado al inicio como las entradas ya agregadas en la
-corrida actual). Si coincide, el `path` se reporta en `result.duplicates`
-(status `"duplicate"`) y no se copia a bronze ni se agrega entrada nueva
-al manifest.
+Pipeline de `ingest_paths` (orden real del bucle, ver también su
+docstring): precondición global de tenant (CA-08) → carga del ledger
+(`manifest.json`, una sola lectura) → expansión de `paths` en candidatos
+planos, incluyendo el recorrido de carpetas (CA-03/CA-04) → por cada
+candidato: validación de existencia/extensión/tamaño (CA-07/CA-09) → hash
+`sha256` sobre los bytes crudos, sin parsear el contenido (CA-10) → dedupe
+por contenido contra el manifest en memoria (CA-05) → resolución de nombre
+en bronze, con sufijo `__<sha8>` ante colisión de nombre con contenido
+distinto (CA-06) → copia byte a byte → entrada `pending` en el manifest
+(CA-02). El procesamiento es parcial: una ruta inválida no aborta el resto
+de `paths` (CA-07); el manifest se persiste en una única escritura al
+final, y `IngestResult.exit_code` deriva de si hubo algún `failed`.
 """
 from __future__ import annotations
 
@@ -36,11 +28,30 @@ from datetime import datetime
 from pathlib import Path
 
 
-REASON_EMPTY_FILE = "archivo vacío"
-"""Motivo de fallo (CA-09) para un `path` que pesa 0 bytes.
+ALLOWED_EXTENSIONS = {".csv", ".xlsx"}
+"""Allow-list de extensiones (CA-03/CA-07) para candidatos a ingesta.
 
-Constante de texto estable para que los tests puedan referenciarla sin
-acoplarse a una redacción frágil (ver `spec.md`, "Motivos de fallo")."""
+Comparación case-insensitive contra `Path(p).suffix.lower()`. Se usa tanto
+para filtrar (en silencio) el recorrido plano de una carpeta (`_expand_paths`)
+como para validar (reportando en `result.failed`) un archivo suelto pasado
+directamente a `ingest_paths` (`_validate_file`)."""
+
+
+# Motivos de fallo (CA-07/CA-09): constantes de texto estable para que los
+# tests puedan referenciarlas sin acoplarse a una redacción frágil (ver
+# `spec.md`, "Motivos de fallo"). Ordenadas igual que las guardas de
+# `_validate_file`: existencia → extensión → tamaño.
+
+REASON_PATH_NOT_FOUND = "la ruta no existe"
+"""Motivo de fallo (CA-07) para un `path` que no existe en disco."""
+
+REASON_EXTENSION_NOT_ALLOWED = "extensión fuera de allow-list"
+"""Motivo de fallo (CA-07) para un archivo suelto con extensión fuera de
+`ALLOWED_EXTENSIONS`. No aplica a los candidatos ya filtrados dentro de una
+carpeta (esos nunca llegan aquí con extensión inválida, ver `_expand_paths`)."""
+
+REASON_EMPTY_FILE = "archivo vacío"
+"""Motivo de fallo (CA-09) para un `path` que pesa 0 bytes."""
 
 
 class TenantNotFoundError(Exception):
@@ -63,7 +74,7 @@ class IngestResult:
     """Rutas no-op por dedupe (CA-05): `{"path", "sha256", "status": "duplicate"}`."""
 
     failed: list[dict] = field(default_factory=list)
-    """Rutas rechazadas en validación (CA-09): `{"path", "reason"}`."""
+    """Rutas rechazadas en validación (CA-07/CA-09): `{"path", "reason"}`."""
 
     @property
     def exit_code(self) -> int:
@@ -82,19 +93,30 @@ def ingest_paths(
     (`data/bronze/` y `data/manifest.json`). Si falta, se lanza
     `TenantNotFoundError` sin crear ni modificar ningún artefacto en disco.
 
-    Camino feliz (CA-01): cada `path` se copia byte a byte a
-    `data/bronze/<nombre>`, se calcula su `sha256` y se agrega una entrada
-    `{"file", "sha256", "ingested_at", "status": "pending"}` al manifest,
-    que se persiste en una sola escritura al final.
+    Cada elemento de `paths` (archivo suelto o carpeta, en cualquier
+    combinación, CA-04) se procesa de forma independiente y parcial
+    (CA-07): una ruta inválida no aborta el resto. Una carpeta se expande a
+    sus archivos de primer nivel con extensión en `ALLOWED_EXTENSIONS`
+    (recorrido plano, sin recursión, CA-03); subcarpetas y extensiones no
+    permitidas dentro de ella se ignoran en silencio (no van a
+    `result.failed`). Cada candidato resultante pasa por:
 
-    Validación básica por archivo (CA-09): si `path` pesa 0 bytes, se
-    reporta en `result.failed` con motivo `REASON_EMPTY_FILE` y no se copia
-    a bronze ni se agrega entrada al manifest (deriva `exit_code == 1`).
-
-    Dedupe por contenido (CA-05): si el `sha256` de `path` ya está en el
-    manifest (ledger previo o entradas ya acumuladas en esta misma
-    invocación), se reporta en `result.duplicates` (no-op, no cuenta como
-    fallo) sin copiar a bronze ni agregar entrada nueva.
+    - **Validación** (CA-07/CA-09): ruta inexistente
+      (`REASON_PATH_NOT_FOUND`), extensión fuera de `ALLOWED_EXTENSIONS`
+      (`REASON_EXTENSION_NOT_ALLOWED`) o archivo de 0 bytes
+      (`REASON_EMPTY_FILE`) se reportan en `result.failed` con su motivo y
+      no se copian ni se anotan (deriva `exit_code == 1`).
+    - **Dedupe por contenido** (CA-05): si el `sha256` del archivo ya está
+      en el manifest (ledger previo o entradas acumuladas en esta misma
+      invocación), se reporta en `result.duplicates` (no-op, no cuenta
+      como fallo) sin copiar ni agregar entrada nueva.
+    - **Copia + nombrado** (CA-01/CA-06): el archivo se copia byte a byte a
+      `data/bronze/<nombre>`. Si ya existe en bronze un archivo con ese
+      nombre pero contenido distinto, se almacena con sufijo
+      `<stem>__<sha8><suffix>` en vez de sobrescribir el original.
+    - **Manifest** (CA-02): se agrega una entrada
+      `{"file", "sha256", "ingested_at", "status": "pending"}` en memoria,
+      persistida en una sola escritura al final de la invocación.
     """
     tenant_dir = Path(clients_root) / client
     bronze_dir, manifest_path = _resolve_tenant_paths(tenant_dir)
@@ -107,7 +129,7 @@ def ingest_paths(
 
     result = IngestResult()
 
-    for path_str in paths:
+    for path_str in _expand_paths(paths):
         source = Path(path_str)
 
         reason = _validate_file(source)
@@ -123,10 +145,11 @@ def ingest_paths(
             )
             continue
 
-        destination = bronze_dir / source.name
+        stored_name, destination = _resolve_destination(source, sha256, bronze_dir)
+
         shutil.copyfile(source, destination)
 
-        entry = _build_manifest_entry(name=source.name, sha256=sha256)
+        entry = _build_manifest_entry(name=stored_name, sha256=sha256)
         manifest["files"].append(entry)
         known_sha256.add(sha256)
         result.ingested.append(entry)
@@ -145,18 +168,64 @@ def _resolve_tenant_paths(tenant_dir: Path) -> tuple[Path, Path]:
     return tenant_dir / "data" / "bronze", tenant_dir / "data" / "manifest.json"
 
 
+def _expand_paths(paths: list[str]) -> list[str]:
+    """Despacha cada `path` de `paths` a la lista plana de candidatos (CA-03/CA-04).
+
+    Itera `paths` en orden, tratando archivo suelto y carpeta como orígenes
+    combinables en la misma invocación (CA-04). Un `path` que no es carpeta
+    se agrega tal cual (camino de archivo suelto, sin filtrar por
+    allow-list). Un `path` que es carpeta se recorre en plano (`iterdir()`,
+    solo primer nivel, sin recursión) y solo se agregan sus entradas que son
+    archivo con extensión en `ALLOWED_EXTENSIONS` (case-insensitive);
+    subcarpetas y extensiones fuera de la allow-list se ignoran en silencio
+    (no llegan a `result.failed`).
+    """
+    candidates: list[str] = []
+    for path_str in paths:
+        source = Path(path_str)
+        if source.is_dir():
+            for entry in sorted(source.iterdir()):
+                if entry.is_file() and entry.suffix.lower() in ALLOWED_EXTENSIONS:
+                    candidates.append(str(entry))
+        else:
+            candidates.append(path_str)
+    return candidates
+
+
 def _validate_file(source: Path) -> str | None:
-    """Valida un `path` candidato a ingesta (CA-09).
+    """Valida un `path` candidato a ingesta (CA-07/CA-09).
 
     Retorna el motivo de fallo (para `result.failed`) si la validación no
     pasa, o `None` si el archivo es válido para continuar el camino feliz.
-    Cubre, por ahora, solo la validación de tamaño > 0 (archivo vacío); el
-    resto de las validaciones de la allow-list (existencia de ruta,
-    extensión) se suman aquí en casos posteriores del bucle TDD.
+    Orden de validación (CA-07): primero existencia de ruta, luego extensión
+    fuera de allow-list, luego tamaño > 0 (archivo vacío). Los candidatos
+    provenientes del recorrido plano de una carpeta (`_expand_paths`) ya
+    fueron filtrados por extensión ahí, así que nunca fallan aquí por esa
+    causa.
     """
+    if not source.is_file():
+        return REASON_PATH_NOT_FOUND
+    if source.suffix.lower() not in ALLOWED_EXTENSIONS:
+        return REASON_EXTENSION_NOT_ALLOWED
     if source.stat().st_size == 0:
         return REASON_EMPTY_FILE
     return None
+
+
+def _resolve_destination(source: Path, sha256: str, bronze_dir: Path) -> tuple[str, Path]:
+    """Resuelve el nombre y la ruta de destino en bronze para `source` (CA-06).
+
+    Por defecto usa `source.name`. Si ya existe un archivo con ese nombre en
+    `bronze_dir` y su `sha256` difiere de `sha256` (colisión de nombre con
+    contenido distinto, no capturada por el dedupe de CA-05), se usa en su
+    lugar `<stem>__<sha8><suffix>` para no sobrescribir el original.
+    """
+    stored_name = source.name
+    destination = bronze_dir / stored_name
+    if destination.is_file() and _hash_file(destination) != sha256:
+        stored_name = f"{source.stem}__{sha256[:8]}{source.suffix}"
+        destination = bronze_dir / stored_name
+    return stored_name, destination
 
 
 def _hash_file(source: Path) -> str:
