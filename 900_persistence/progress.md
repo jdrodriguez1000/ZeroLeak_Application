@@ -19,6 +19,7 @@ Consultándolo siempre sabemos el estado y avance actual del proyecto.
 - [2026-07-13] T-28 (Tracer Bullet `ingest`) iniciado: rama `feature/ingest` creada desde `main`, carpeta `610_features/ingest/` creada, paso 2 del flujo completado con `feature_contract.md` escrito por la sesión principal (materializa D-17, deja D-18 fuera de alcance). Paso 3 (`feature_definer`) pendiente.
 - [2026-07-13] T-28 avanzado (pasos 3-9 completos, paso 10 al 42%): `definition.md` (8 HU), `ingest.ipynb` ejecutado y aprobado (gate paso 5, 3 decisiones ratificadas: sufijo `__<sha8>` en colisión, exit codes 0/1/2, duplicate=SKIP no-op), `spec.md` con 12 CA aprobada (gate paso 7, 3 defaults ratificados: extensiones case-insensitive, manifest con solo 4 campos, `ingested_at` timespec segundos), `plan.md` con 27 TSK y 12 casos aprobado (gate paso 9). Bucle TDD (paso 10): 5 de 12 casos cerrados (CA-08, CA-01, CA-02 caracterizado, CA-09, CA-05); código de producción en `app/src/zeroleak/ingest/core.py`; suite 49 passed. Sesión suspendida a pedido del humano tras el Caso 5.
 - [2026-07-14] **Bucle TDD (paso 10) del Tracer Bullet `ingest` COMPLETO (12/12 casos):** cerrados los bloques 3 (casos 6-9) y 4 (casos 10-12) — colisión de nombre (CA-06), recorrido plano de carpeta (CA-03), argumentos mezclados (CA-04, caracterización), delimitadores sin parseo (CA-10, caracterización), procesamiento parcial (CA-07), frontera `.gitignore` (CA-11, caracterización), fachada CLI `zlk ingest` (CA-12). Suite total 64 passed, 0 regresiones. Próximo paso: pasos 11-13 (integración e2e, `spec_verifier`, gate humano, PR a `main`).
+- [2026-07-14] **Tracer Bullet `ingest` — pasos 11-12 completos:** `integration_tester` creó `app/tests/integration/test_ingest_e2e.py` (5 tests por subprocess real del comando `zlk` instalado, cubren CA-01, CA-05, CA-07, CA-08, CA-12); suite total 69 passed. `spec_verifier` (contexto fresco) auditó los 12 CA con evidencia real de ejecución propia (69 passed) y produjo `610_features/ingest/verification.md` con veredicto **CONFORME** (12/12 CA cubiertos, 0 hallazgos, C-01 verificada con `git check-ignore`/`git status --ignored`). `state.json` actualizado: `integration_tester` y `spec_verifier` en `done`, `current_stage="human_test"`. Pendiente paso 13: gate humano (pruebas locales del humano) y apertura de PR `feature/ingest`→`main`.
 
 ---
 
@@ -61,11 +62,18 @@ implementada). Código de producción: `app/src/zeroleak/ingest/core.py` (`inges
 `_build_manifest_entry`, `_resolve_destination`, `_expand_paths`) y su `__init__.py`; `app/src/zeroleak/
 cli.py` (subcomando `ingest` agregado, simétrico a `client new`); tests en `app/tests/test_ingest.py`
 (ampliado) y `app/tests/test_cli_ingest.py` (nuevo), fixtures en `app/tests/conftest.py`
-(`ingestible_tenant`, `read_manifest`). Suite total: **64 passed**, sin regresiones. El **próximo paso
-pendiente** es el **paso 11**: integración e2e (TSK-25, `integration_tester` sobre `zlk ingest` por
-subprocess), luego paso 12 (`spec_verifier`, `verification.md`), gate humano final (`human_test`) y
-apertura de PR hacia `main` (`merge_to_main`). La carpeta `clients/MI_BUNUELO/` sigue siendo un tenant de
-prueba manual del humano, sin versionar (no revisada en esta sesión).
+(`ingestible_tenant`, `read_manifest`). Suite total: **64 passed**, sin regresiones. Los **pasos 11 y 12
+del flujo ya están completos**: paso 11, `integration_tester` creó `app/tests/integration/
+test_ingest_e2e.py` (5 tests por subprocess real del comando `zlk` instalado, cubren CA-01, CA-05, CA-07,
+CA-08 y CA-12), llevando la suite total a **69 passed**; paso 12, `spec_verifier` (en contexto fresco)
+auditó con evidencia real de ejecución propia (69 passed) los 12 CA-01…CA-12 y produjo `610_features/
+ingest/verification.md` con veredicto **CONFORME** (12/12 CA cubiertos, 0 parciales, 0 sin cubrir, C-01
+verificada con `git check-ignore`/`git status --ignored`, sin hallazgos). `state.json` quedó con
+`integration_tester` y `spec_verifier` en `done` y `current_stage="human_test"`. El **próximo paso
+pendiente** es el **paso 13 (final)**: gate humano (`human_test` — el humano hará pruebas locales antes de
+mergear) y apertura de PR `feature/ingest`→`main` (`merge_to_main`), que deberá aprobar y mergear el
+humano. La carpeta `clients/MI_BUNUELO/` sigue siendo un tenant de prueba manual del humano, sin versionar
+(no revisada en esta sesión).
 
 El proyecto **cerró su primer Tracer Bullet, `client_scaffold` (T-21)**, con los 13 pasos del
 flujo completos: `feature/client_scaffold` fue mergeada a `main` vía PR #1, aprobado y mergeado por el
@@ -186,7 +194,7 @@ el feature `client_scaffold` en `610_features/client_scaffold/` (código en
 - **[2026-07-14]** **T-28 avanzada y bucle TDD (paso 10) CERRADO (bloques 3 y 4, casos 6-12, Tracer Bullet `ingest`):** ciclo `tdd_tester → tdd_coder → tdd_refactor` en contexto fresco por fase. Caso 6 (CA-06, TSK-12/13): colisión de nombre con contenido distinto → sufijo `__<sha8>` sin sobrescribir el original; helper `_resolve_destination` extraído. Caso 7 (CA-03, TSK-14/15): despacho de carpeta con recorrido plano (`iterdir`), filtrado por `ALLOWED_EXTENSIONS`, ignorado silencioso de subcarpetas/extensiones; helper `_expand_paths` extraído. Caso 8 (CA-04, TSK-16/17): argumentos mezclados [archivo, carpeta], caracterización (ya cubierto por `_expand_paths` del Caso 7); TSK-17 `cancelada_suspendida`. Caso 9 (CA-10, TSK-18/19): delimitadores `,`/`;`/`|` sin parseo, caracterización (ya cubierto por el diseño byte-a-byte desde el Caso 2); TSK-19 `cancelada_suspendida`. Caso 10 (CA-07, TSK-20/21): procesamiento parcial — validación de existencia ("la ruta no existe") y extensión ("extensión fuera de allow-list") para archivos sueltos, exit_code==1; refactor integral del core (constantes de motivo `REASON_*` agrupadas, docstrings CA-01..CA-10); TSK-26 marcada implementada (parcial, parte core). Caso 11 (CA-11, TSK-22): frontera PII del `.gitignore` vía `git check-ignore` sobre rutas ficticias, caracterización (regla `clients/*/data/` ya vigente, sin código nuevo); nuevo archivo de tests. Caso 12 (CA-12, TSK-23/24/27): fachada CLI `zlk ingest <CLIENTE> <ruta>...` en `cli.py` — parseo, invocación del core, reporte OK/SKIP/FAIL, traducción de exit codes 0/1/2; nuevo archivo `app/tests/test_cli_ingest.py`; TSK-27 implementada. `state.json`: `stages.tdd.status="done"`. Archivos de producción tocados: `app/src/zeroleak/ingest/core.py`, `app/src/zeroleak/ingest/__init__.py`, `app/src/zeroleak/cli.py`; tests: `app/tests/test_ingest.py` (ampliado), `app/tests/test_cli_ingest.py` (nuevo). Suite total: **64 passed**, 0 regresiones.
 
 ## Lo próximo a realizar
-- **Prioridad inmediata:** pasos 11-13 del flujo del segundo Tracer Bullet, **`ingest`** (T-28) — paso 11: integración e2e (TSK-25, `integration_tester` sobre `zlk ingest` por subprocess); paso 12: `spec_verifier` (`verification.md`); paso 13: gate humano final (`human_test`) y apertura de PR hacia `main` (`merge_to_main`).
+- **Prioridad inmediata:** paso 13 (final) del flujo del segundo Tracer Bullet, **`ingest`** (T-28) — gate humano (`human_test`): el humano hará pruebas locales antes de mergear; luego la sesión principal abrirá el PR `feature/ingest`→`main` (`merge_to_main`), que el humano deberá aprobar y mergear (nunca el agente).
 - (Menor) Terminar de verificar el registro completo de los agentes `.claude/agents/*.md` como subagentes tras reiniciar Claude Code (T-13); confirmar que persistan entre sesiones/reinicios.
 - (Menor) Evaluar si se desean colores distintos para los agentes que hoy comparten color (ver nota en `lessons.md` L-04).
 - (Nota) `clients/MI_BUNUELO/` es un tenant de prueba manual del humano (no es entregable); queda sin versionar en el working tree; no revisado en esta sesión.

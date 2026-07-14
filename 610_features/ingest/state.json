@@ -1,7 +1,7 @@
 {
   "feature": "ingest",
   "status": "in_progress",
-  "current_stage": "tdd",
+  "current_stage": "human_test",
   "stages": {
     "feature_contract": {
       "status": "done",
@@ -184,11 +184,15 @@
       ]
     },
     "integration_tester": {
-      "status": "pending"
+      "status": "done",
+      "artifact": "app/tests/integration/test_ingest_e2e.py",
+      "desc": "TSK-25: suite e2e (5 tests) que invoca el comando 'zlk' instalado por subprocess real (patron identico a test_client_new_e2e.py de client_scaffold), sobre clients_root sinteticos en tmp_path. Cubre: (1) csv valido -> copia byte a byte a bronze + entrada pending con sha256 correcto, exit 0 (CA-01); (2) mezcla valida+vacia+extension-no-permitida+inexistente -> solo la valida se ingiere, exit 1, sin residuo de las invalidas (CA-07); (3) dedupe: reenviar en una segunda invocacion real un archivo con sha256 ya en el manifest es no-op, exit 0 (CA-05); (4) tenant inexistente -> exit 2, stderr no vacio, clients_root sin residuo (CA-08); (5) equivalencia de arbol/manifest entre 'zlk ingest' via subprocess y 'ingest_paths' invocado en proceso sobre un clients_root gemelo (CA-12). Ejecucion real: pytest app/tests -q -> 69 passed, 0 failed (64 previos del bucle TDD + 5 nuevos), sin fallos end-to-end que reportar. No se modifico ningun archivo de produccion (app/src/zeroleak/...); unico archivo escrito: app/tests/integration/test_ingest_e2e.py."
     },
     "spec_verifier": {
-      "status": "pending",
-      "artifact": "verification.md"
+      "status": "done",
+      "artifact": "verification.md",
+      "verdict": "CONFORME",
+      "desc": "Paso 12 (contexto fresco): auditoria critica de los 12 criterios CA-01..CA-12 contra evidencia de ejecucion real (pytest ejecutado por el verificador, no reportes previos): py -3.13 -m pytest -q -> 69 passed in 8.37s (25 tests de ingest, incluidos los 5 e2e por subprocess real; 44 de client_scaffold sin regresiones). Matriz de trazabilidad: 12/12 CA cubiertos, 0 parciales, 0 sin cubrir. C-01 (Datos en Boveda) cumplida: datos sinteticos en tmp_path; clients/*/data/ ignorado, verificado con git check-ignore y git status --ignored sobre el repo real. Out-of-scope respetado: no parsea contenido, no genera period/run_id/output, no recursa, no empareja contrato (D-18 sigue abierto). Hallazgos: ninguno. Veredicto: CONFORME. Artefacto: verification.md. Siguiente: paso 13 (human_test + merge_to_main / PR)."
     },
     "human_test": {
       "status": "pending",
