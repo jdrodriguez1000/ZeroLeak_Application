@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from zeroleak.core.scaffold import ClientNameError, TenantExistsError, create_client
+from zeroleak.ingest import IngestResult, TenantNotFoundError, ingest_paths
 
 
 def _clients_root() -> Path:
@@ -22,7 +23,10 @@ def _clients_root() -> Path:
     return Path(os.environ.get("ZEROLEAK_CLIENTS_ROOT", "clients"))
 
 
-_USAGE = "uso: zlk client new <NOMBRE_CLIENTE>"
+_USAGE = (
+    "uso: zlk client new <NOMBRE_CLIENTE>\n"
+    "     zlk ingest <CLIENTE> <ruta>..."
+)
 
 
 def _parse_client_new_name(argv: list[str]) -> str | None:
@@ -52,11 +56,53 @@ def _dispatch_client_new(name: str) -> int:
     return 0
 
 
+def _parse_ingest_args(argv: list[str]) -> tuple[str, list[str]] | None:
+    """Extrae `(<CLIENTE>, [<ruta>, ...])` de `argv` si es una invocación
+    válida de `ingest`; retorna `None` si `argv` no corresponde a ese
+    subcomando.
+    """
+    if len(argv) >= 3 and argv[0] == "ingest":
+        return argv[1], argv[2:]
+    return None
+
+
+def _print_ingest_report(result: IngestResult) -> None:
+    """Imprime un reporte legible OK/SKIP/FAIL con resumen de conteos
+    (formato libre, CA-12: la CLI es una fachada delgada sobre `IngestResult`).
+    """
+    for entry in result.ingested:
+        print(f"OK   {entry['file']}")
+    for entry in result.duplicates:
+        print(f"SKIP {entry['path']} (duplicado)")
+    for entry in result.failed:
+        print(f"FAIL {entry['path']} ({entry['reason']})", file=sys.stderr)
+    print(
+        f"Resumen: {len(result.ingested)} ingeridos, "
+        f"{len(result.duplicates)} duplicados, "
+        f"{len(result.failed)} fallidos"
+    )
+
+
+def _dispatch_ingest(client: str, paths: list[str]) -> int:
+    """Ejecuta `ingest <client> <paths>...` delegando en `ingest_paths` y
+    traduce el resultado/excepción de dominio al exit code correspondiente
+    (CA-12): éxito total -> 0, fallo parcial -> 1, `TenantNotFoundError` -> 2.
+    """
+    try:
+        result = ingest_paths(client, paths, _clients_root())
+    except TenantNotFoundError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    _print_ingest_report(result)
+    return result.exit_code
+
+
 def main(argv: list[str] | None = None) -> int:
     """Punto de entrada de la consola `zlk`.
 
-    Soporta por ahora `zlk client new <NOMBRE_CLIENTE>`: delega en
-    `create_client` e imprime por stdout la ruta del tenant creado.
+    Soporta `zlk client new <NOMBRE_CLIENTE>`: delega en `create_client` e
+    imprime por stdout la ruta del tenant creado; y `zlk ingest <CLIENTE>
+    <ruta>...`: delega en `ingest_paths` e imprime un reporte OK/SKIP/FAIL.
     """
     if argv is None:
         argv = sys.argv[1:]
@@ -65,5 +111,13 @@ def main(argv: list[str] | None = None) -> int:
     if name is not None:
         return _dispatch_client_new(name)
 
+    ingest_args = _parse_ingest_args(argv)
+    if ingest_args is not None:
+        return _dispatch_ingest(*ingest_args)
+
     print(_USAGE, file=sys.stderr)
     return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
