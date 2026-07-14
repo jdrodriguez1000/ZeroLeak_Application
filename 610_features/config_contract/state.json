@@ -1,0 +1,72 @@
+{
+  "feature": "config_contract",
+  "status": "in_progress",
+  "current_stage": "tdd",
+  "stages": {
+    "feature_contract": {
+      "status": "done",
+      "artifact": "feature_contract.md",
+      "owner": "main_session"
+    },
+    "feature_definer": {
+      "status": "done",
+      "artifact": "definition.md"
+    },
+    "notebook_writer": {
+      "status": "done",
+      "artifact": "config_contract.ipynb",
+      "gate": "human",
+      "awaiting_approval": false,
+      "approved": true
+    },
+    "spec_writer": {
+      "status": "done",
+      "artifact": "spec.md",
+      "gate": "human",
+      "awaiting_approval": false,
+      "approved": true
+    },
+    "plan_builder": {
+      "status": "done",
+      "artifact": "plan.md",
+      "gate": "human",
+      "awaiting_approval": false,
+      "approved": true
+    },
+    "tdd": {
+      "status": "in_progress",
+      "cases": [
+        { "id": 1, "status": "refactored", "ca": ["CA-01"], "tsk": ["TSK-01", "TSK-02", "TSK-03"], "desc": "REFACTORED: pulido de estilo/documentacion sobre el camino feliz de TSK-03 (sin cambios de comportamiento). Se agrego referencia explicita a CA-01/CA-02 en los docstrings de Contract y Columna, y un comentario aclaratorio sobre la clave raiz contract_data/columnas en load_contract. Se confirmo honestamente que el codigo del Caso 1 es minimo (solo camino feliz) y no hay duplicacion ni abstracciones de manejo de errores que extraer todavia (eso corresponde a TSK-28 tras consolidar el core); no se adelanto ningun helper especulativo de parseo/esquema/duplicados. Suite completa: 70 passed, sin regresiones. Siguiente: tdd_tester avanza al Caso 2." },
+        { "id": 2, "status": "characterized", "ca": ["CA-02"], "tsk": ["TSK-04", "TSK-05"], "desc": "CHARACTERIZED: test_load_contract_fidelidad_de_campos (CA-02) escrito y ejecutado PASA de inmediato contra el codigo del Caso 1 (TSK-03): Columna, al ser un modelo Pydantic con los 4 campos declarados 1:1 sin coercion adicional, ya mapea nombre/tipo/nulable/llave fielmente como efecto colateral del diseño. Verificacion honesta: se inyecto temporalmente un defecto (field_validator que forzaba nulable=True) en contract.py, se confirmo que el test FALLA correctamente detectando la discrepancia (assert True is False), y se revirtio el cambio sin dejar rastro (git diff limpio). El test se mantiene como test de caracterizacion/regresion para CA-02. GREEN (paso 10, tdd_coder): confirmado por inspeccion de config/contract.py (Columna: nombre/tipo/nulable/llave, 1:1, sin coercion) que TSK-03 ya satisface CA-02; TSK-05 marcada cancelada_suspendida en plan.md (sin entregable de codigo nuevo, patron ingest Casos 3/8/9). Suite completa: 71 passed, sin regresiones. Siguiente: tdd_tester avanza al Caso 3 (TSK-06/07, CA-03)." },
+        { "id": 3, "status": "characterized", "ca": ["CA-03"], "tsk": ["TSK-06", "TSK-07"], "desc": "CHARACTERIZED: test_load_contract_seis_tipos_enum (CA-03) escrito y ejecutado PASA de inmediato contra el enum TipoDato ya construido en el Caso 1 (TSK-03), que ya incluye los 6 valores (string/integer/float/date/datetime/boolean). Verificacion honesta: se removio temporalmente DATETIME del enum en contract.py, se confirmo que el test FALLA correctamente (pydantic.ValidationError: 'datetime' no es un valor permitido, columnas.4.tipo), y se revirtio el cambio sin dejar rastro (git diff limpio, suite completa 72 passed sin regresiones). El test se mantiene como test de caracterizacion/regresion para CA-03, con valor especial como blindaje de que datetime (anadido por D-23b tras el spike, que solo prototipo 5 tipos) permanece en el enum. GREEN (paso 10, tdd_coder): confirmado por inspeccion de config/contract.py que TipoDato ya tiene exactamente los 6 valores (STRING/INTEGER/FLOAT/DATE/DATETIME/BOOLEAN) satisfaciendo CA-03 sin cambios de codigo; TSK-07 marcada cancelada_suspendida en plan.md (sin entregable de codigo nuevo, patron Caso 2 / ingest Casos 3/8/9). Suite completa: 72 passed, sin regresiones. Siguiente: tdd_tester avanza al Caso 4 (TSK-08/09, CA-04)." },
+        { "id": 4, "status": "refactored", "ca": ["CA-04"], "tsk": ["TSK-08", "TSK-09"], "desc": "REFACTORED (paso 10, tdd_refactor): pulido de estilo/documentacion sobre el GREEN de TSK-09 en config/contract.py, sin cambios de comportamiento. Cambios: (1) nota del docstring de modulo actualizada para reflejar que ya cubre CA-01..CA-04 (estaba desactualizada, aun decia 'solo camino feliz del Caso 1'); (2) variable de excepcion renombrada de 'e' a 'exc' en load_contract y _mensaje_esquema, alineando con la convencion ya usada en cli.py (except ... as exc); (3) docstring de _mensaje_esquema ampliado para dejar explicito que su diseno generico (toma exc.errors()[0], no hardcodea 'tipo') es intencional para cubrir sin cambios los demas campos faltantes del Caso 5 (CA-05), evitando que un futuro lector lo confunda con una abstraccion especulativa. NO se adelanto ningun manejo de enum invalido (CA-06), lista vacia (CA-11) ni duplicados (CA-09/10): eso queda para sus propios casos y para el refactor integral reservado en TSK-28 al cerrar el core. Suite completa: 73 passed, mismo conteo, sin regresiones; tests no tocados. Siguiente: tdd_tester avanza al Caso 5 (TSK-10/11, CA-05)." },
+        { "id": 5, "status": "characterized", "ca": ["CA-05"], "tsk": ["TSK-10", "TSK-11"], "desc": "CHARACTERIZED (paso 10, tdd_tester): test_load_contract_otros_campos_faltantes (CA-05), parametrizado sobre nombre/nulable/llave faltante en la columna de indice 1, escrito en test_config_contract.py y ejecutado PASA de inmediato (3 passed) contra _mensaje_esquema (TSK-09), que ya es generico (toma exc.errors()[0] via loc/type, no hardcodea 'tipo') y por tanto ya cubre los demas campos requeridos como efecto colateral del diseno del Caso 4. Verificacion honesta: se inyecto temporalmente un defecto en _mensaje_esquema (rama 'if campo != tipo: return mensaje generico sin nombre de campo') y se confirmo que los 3 casos parametrizados FALLAN correctamente (AssertionError: 'llave' in 'error de esquema en el contrato', etc.); se revirtio el cambio sin dejar rastro (git diff limpio sobre contract.py). El test se mantiene como test de caracterizacion/regresion para CA-05. GREEN (paso 10, tdd_coder): confirmado por inspeccion de config/contract.py que _mensaje_esquema (TSK-09) ya es generico por loc/type (no hardcodea 'tipo') y por tanto ya satisface CA-05 sin codigo nuevo; no se modificaron tests. TSK-11 marcada cancelada_suspendida en plan.md (sin entregable de codigo nuevo, mismo patron que TSK-05/TSK-07 en Casos 2/3). Suite completa: 76 passed, sin regresiones. Siguiente: tdd_refactor puede pulir estilo si aplica; luego tdd_tester avanza al Caso 6 (TSK-12/13, CA-06)." },
+        { "id": 6, "status": "refactored", "ca": ["CA-06"], "tsk": ["TSK-12", "TSK-13"], "desc": "REFACTORED (paso 10, tdd_refactor): sobre el GREEN de TSK-13 en config/contract.py, sin cambios de comportamiento. Revision honesta: la extraccion comun de campo/indice desde loc ya vivia antes de las 3 ramas (missing/enum/fallback), sin duplicacion real que extraer entre ellas; no se creo ningun helper nuevo para no adelantar la consolidacion integral reservada a TSK-28. Unico cambio material: el docstring de _mensaje_esquema estaba desactualizado (aun decia 'cubre hoy CA-04, pensado para CA-05', sin mencionar la rama enum anadida para CA-06); se reescribio para documentar las 3 ramas (missing/CA-04-05, enum/CA-06, fallback generico) y dejar explicita la extraccion compartida de campo/indice. El docstring de modulo (nota parrafo superior) ya referenciaba CA-06 correctamente y no requirio cambios. No se toco load_contract (ya limpio) ni ningun test. Suite completa: py -3.13 -m pytest app/tests -q -> 77 passed, mismo conteo, sin regresiones. Siguiente: tdd_tester avanza al Caso 7 (TSK-14/15, CA-11)." },
+        { "id": 7, "status": "pending", "ca": ["CA-11"], "tsk": ["TSK-14", "TSK-15"], "desc": "columnas: [] (lista vacia) -> ContractSchemaError 'la lista de columnas no puede estar vacia'; sin objeto." },
+        { "id": 8, "status": "pending", "ca": ["CA-09"], "tsk": ["TSK-16", "TSK-17"], "desc": "Dos columnas de nombre identico (cadena exacta) -> ContractSchemaError que nombra el duplicado; sin objeto." },
+        { "id": 9, "status": "pending", "ca": ["CA-10"], "tsk": ["TSK-18"], "desc": "Dos nombre que difieren solo en mayusculas/espacios (test_id vs Test_ID) -> no es duplicado, no falla por esa causa." },
+        { "id": 10, "status": "pending", "ca": ["CA-07"], "tsk": ["TSK-19", "TSK-20"], "desc": "YAML sintacticamente roto -> ContractParseError, no ContractSchemaError; distinguibles por tipo." },
+        { "id": 11, "status": "pending", "ca": ["CA-08"], "tsk": ["TSK-21", "TSK-22"], "desc": "El mensaje de ContractParseError es claro y accionable (sintaxis YAML invalida)." },
+        { "id": 12, "status": "pending", "ca": ["CA-14"], "tsk": ["TSK-23", "TSK-24"], "desc": "YAML que viola > 1 regla (campo faltante Y duplicados) -> una unica excepcion, un primer error, sin lista agregada (fail-fast)." },
+        { "id": 13, "status": "pending", "ca": ["CA-12"], "tsk": ["TSK-25"], "desc": "Instrumentando open, load_contract abre solo el propio contract_data.yaml; ninguna ruta bajo data/bronze/." },
+        { "id": 14, "status": "pending", "ca": ["CA-13"], "tsk": ["TSK-26"], "desc": "load_contract invocable directamente (sin argv/subprocess/CLI), firma load_contract(path) -> Contract; no existe zlk contract validate." },
+        { "id": 15, "status": "pending", "ca": ["CA-15"], "tsk": ["TSK-27"], "desc": "Todos los fixtures son YAMLs sinteticos, sin PII, ninguno bajo clients/*/data/." }
+      ]
+    },
+    "integration_tester": {
+      "status": "skipped",
+      "desc": "Core-only (D-23d): la feature no expone CLI ni comando instalado; no hay subprocess que ejecutar. CA-13 se cubre invocando load_contract directamente en el bucle TDD."
+    },
+    "spec_verifier": {
+      "status": "pending"
+    },
+    "human_test": {
+      "status": "pending",
+      "gate": "human"
+    },
+    "merge_to_main": {
+      "status": "pending",
+      "gate": "human"
+    }
+  }
+}

@@ -3,7 +3,7 @@ name: spec-writer
 description: Ejecuta el paso 6 del flujo de construcción de ZeroLeak. Tras aprobarse el notebook (gate del paso 5), especifica el **comportamiento observable** de la feature —entradas, salidas, contratos, casos límite— con criterios de aceptación verificables (`CA-xx`), cada uno enlazado a una historia `HU-xx`, produciendo `spec.md`. Invocar cuando el notebook esté aprobado y haya que escribir la especificación.
 tools: Read, Glob, Grep, Write, Edit
 model: opus
-color: magenta
+color: pink
 ---
 
 # Spec Writer — Paso 6 del Flujo (Especificación / el "Qué")
