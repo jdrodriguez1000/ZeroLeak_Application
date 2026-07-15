@@ -1,0 +1,60 @@
+# =============================================================================
+# contract_data.yaml — PLANTILLA (guía para el humano)
+# =============================================================================
+#
+# QUÉ ES: el contrato de datos de un cliente. Declara qué columnas debe tener
+# su archivo de datos, de qué tipo es cada una, si admite nulos y si es llave.
+#
+# CÓMO SE USA:
+#   1. Copia este archivo a  clients/<TU_CLIENTE>/input/contract_data.yaml
+#   2. Borra las columnas de ejemplo y escribe las tuyas.
+#   3. Verifica que el motor lo entiende:
+#        py -3.13 610_features/config_contract/cargar_contrato.py clients/<TU_CLIENTE>/input/contract_data.yaml
+#
+# REGLAS (si no se cumplen, la carga falla con un error que dice por qué):
+#   - Debe haber AL MENOS UNA columna. La lista no puede quedar vacía.
+#   - Cada columna necesita los CUATRO campos: nombre, tipo, nulable, llave.
+#   - `tipo` solo admite estos seis valores, escritos igual:
+#         string · integer · float · date · datetime · boolean
+#   - `nulable` y `llave` son true/false.
+#   - No se permiten dos columnas con el mismo `nombre` (comparación exacta:
+#     `test_id` y `Test_ID` se consideran distintos y ambos se aceptan).
+#   - El orden en que escribas las columnas se conserva.
+#
+# QUÉ SIGNIFICA CADA CAMPO:
+#   nombre  → el nombre de la columna, tal cual aparece en el archivo de datos.
+#   tipo    → el tipo de dato esperado (uno de los seis de arriba).
+#   nulable → true si la columna puede venir vacía; false si siempre debe traer valor.
+#   llave   → true si la columna identifica la fila (id, código); false si no.
+#
+# OJO: no borres la línea `contract_data:` ni la línea `columnas:`. Si dejas
+# `contract_data:` sin nada debajo, el archivo no es un contrato válido.
+# =============================================================================
+
+contract_data:
+  columnas:
+    # --- Ejemplos: bórralos y pon tus columnas reales -----------------------
+    - nombre: cliente_id
+      tipo: integer
+      nulable: false
+      llave: true
+
+    - nombre: correo
+      tipo: string
+      nulable: true
+      llave: false
+
+    - nombre: fecha_alta
+      tipo: date
+      nulable: false
+      llave: false
+
+    - nombre: saldo
+      tipo: float
+      nulable: true
+      llave: false
+
+    - nombre: activo
+      tipo: boolean
+      nulable: false
+      llave: false
