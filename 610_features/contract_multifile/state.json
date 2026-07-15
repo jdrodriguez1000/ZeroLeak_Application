@@ -1,7 +1,7 @@
 {
   "feature": "contract_multifile",
   "status": "in_progress",
-  "current_stage": "feature_definer",
+  "current_stage": "notebook_writer",
   "stages": {
     "feature_contract": {
       "status": "done",
@@ -10,8 +10,9 @@
       "desc": "Paso 2 (sesión principal): estrella polar escrita. Materializa D-18 resuelta (contract_data.archivos[].{nombre, columnas}). Decisión de alcance de la sesión principal: se absorben T-56 (bug del `contract_data:` nulo → AttributeError) y T-58 (actualizar 600_template/contract_data.yaml) dentro de esta feature, porque ambos viven en el código que esta feature reescribe; arreglarlos por separado antes sería trabajo desechado. Cimiento: config_contract (T-43, en main vía PR #3) — se reutilizan Columna, TipoDato (6 tipos), validador de duplicados, fail-fast y ContractParseError/ContractSchemaError."
     },
     "feature_definer": {
-      "status": "pending",
-      "artifact": "definition.md"
+      "status": "done",
+      "artifact": "definition.md",
+      "desc": "Paso 3 (feature_definer): definition.md con 12 historias HU-01..HU-12, fiel al feature_contract y trazable. HU-01/02 (forma multi-archivo; un archivo = caso general len(archivos)==1), HU-03/04/05 (validación de nivel archivo: archivos vacía/ausente, archivo sin nombre o sin columnas, nombre de archivo duplicado), HU-06 (validaciones de columna vigentes aplicadas por archivo, con el archivo localizado en el mensaje), HU-07 (ContractParseError se preserva distinguible), HU-08 (T-56: contract_data nulo -> ContractSchemaError, nunca AttributeError), HU-09 (T-58: plantilla multi-archivo cargable), HU-10 (frontera D-21 preservada), HU-11 (migración de tests sin perder cobertura), HU-12 (C-01, fixtures sintéticos). Puntos dejados explícitamente a spec_writer: (a) forma exacta de identificar el archivo en el mensaje de error (índice vs nombre vs ambos); (b) si el duplicado de nombre de archivo compara por cadena exacta (supuesto asumido, consistente con D-23e) o normalizada. Sin contradicciones detectadas entre feature_contract y D-18/D-21/D-22/D-23."
     },
     "notebook_writer": {
       "status": "pending",
