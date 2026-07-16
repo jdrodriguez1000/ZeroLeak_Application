@@ -682,17 +682,33 @@ def test_load_contract_archivo_sin_nombre_m06(
 def test_load_contract_campo_tipo_faltante(
     write_contract_yaml: Callable[..., Path],
 ) -> None:
-    """Destino final: Caso 16 (CA-15, M-09): columna que omite `tipo`, dentro
-    de un archivo, -> `ContractSchemaError` (TSK-03: forma migrada, raw YAML
-    envuelto en `contract_data.archivos[0].columnas`).
+    """Caso 16 (TSK-33, CA-15, M-09, endurecido): columna que omite `tipo`,
+    dentro de un archivo, -> `ContractSchemaError` con el texto literal
+    **M-09** exacto (`archivo[0] 'archivo.csv', columna de índice 1: falta
+    el campo requerido 'tipo' (Field required)`).
 
-    YAML sintético (sin PII, C-01) con dos columnas: la de índice 0
+    Endurecido desde la aserción de subcadena heredada de la migración de
+    forma (TSK-03, Caso 1) al texto literal reordenado M-09 (plan.md,
+    "Estrategia de migración de los tests"): la frase vigente antes de este
+    caso era `falta el campo requerido 'tipo' en la columna de índice 1`
+    (sin el archivo); M-09 antepone el localizador de archivo
+    (`archivo[i] '<nombre>'`) y usa una coma antes de "columna de índice".
+
+    YAML sintético (sin PII, C-01) con dos columnas dentro de un único
+    archivo declarativo (`archivo.csv`, índice 0): la de índice 0
     (`test_id`) es válida y completa; la de índice 1 (`correo`) omite el
-    campo requerido `tipo`. El mensaje de la excepción debe identificar el
-    campo faltante (`tipo`) y la columna afectada por índice/posición
-    (0-based). `load_contract` no debe retornar objeto (la excepción se
-    lanza); además la excepción debe ser exactamente `ContractSchemaError`,
-    no un `pydantic.ValidationError` crudo.
+    campo requerido `tipo`. `load_contract` no debe retornar objeto (la
+    excepción se lanza); además la excepción debe ser exactamente
+    `ContractSchemaError`, no un `pydantic.ValidationError` crudo.
+
+    Este caso **espera código real** (TSK-34): hoy `_mensaje_esquema(exc,
+    archivos_crudos)` no tiene ninguna rama `missing` de **nivel columna**
+    (`loc == ('archivos', i, 'columnas', j, campo)`); cae al fallback
+    genérico de columna (`falta el campo requerido '{campo}' en la columna
+    de índice {indice} ({msg})`, con `indice = loc[1]` = **índice de
+    archivo**, no de columna) -- que además, al no tener el localizador de
+    archivo, difiere del texto M-09 exacto. La aserción de igualdad exacta
+    de mensaje falla por contenido, no por `ImportError` ni `DID NOT RAISE`.
     """
     texto = (
         "contract_data:\n"
@@ -712,9 +728,11 @@ def test_load_contract_campo_tipo_faltante(
     with pytest.raises(ContractSchemaError) as exc_info:
         load_contract(path)
 
-    mensaje = str(exc_info.value)
-    assert "tipo" in mensaje
-    assert "1" in mensaje
+    mensaje_esperado = (
+        f"archivo[0] '{_NOMBRE_ARCHIVO_UNICO}', columna de índice 1: "
+        "falta el campo requerido 'tipo' (Field required)"
+    )
+    assert str(exc_info.value) == mensaje_esperado
 
 
 @pytest.mark.parametrize(
@@ -745,17 +763,29 @@ def test_load_contract_otros_campos_faltantes(
     campo_faltante: str,
     texto_columna_incompleta: str,
 ) -> None:
-    """Destino final: Caso 16 (CA-15, M-09): columna que omite `nombre`/
+    """Caso 16 (TSK-33, CA-15, M-09, endurecido): columna que omite `nombre`/
     `nulable`/`llave` (los otros tres campos requeridos, distintos de `tipo`)
-    -> `ContractSchemaError` (TSK-03: forma migrada).
+    -> `ContractSchemaError` con el texto literal **M-09** exacto
+    (`archivo[0] 'archivo.csv', columna de índice 1: falta el campo
+    requerido '<campo>' (Field required)`).
+
+    Endurecido desde la aserción de subcadena heredada de la migración de
+    forma (TSK-03, Caso 1) al texto literal M-09 (mismo endurecimiento que
+    `test_load_contract_campo_tipo_faltante`, solo que aquí varía el campo
+    requerido bajo prueba).
 
     YAML sintético (sin PII, C-01) con dos columnas dentro de un único
-    archivo: la de índice 0 (`test_id`) es válida y completa; la de índice 1
-    omite el campo requerido bajo prueba (`nombre`, `nulable` o `llave`). El
-    mensaje debe identificar el campo faltante y la columna afectada por
-    índice (0-based); `load_contract` no debe retornar objeto (se lanza la
-    excepción), y ésta debe ser exactamente `ContractSchemaError`, no un
-    `pydantic.ValidationError` crudo.
+    archivo declarativo (`archivo.csv`, índice 0): la de índice 0
+    (`test_id`) es válida y completa; la de índice 1 omite el campo
+    requerido bajo prueba (`nombre`, `nulable` o `llave`). `load_contract`
+    no debe retornar objeto (se lanza la excepción), y ésta debe ser
+    exactamente `ContractSchemaError`, no un `pydantic.ValidationError`
+    crudo.
+
+    Este caso **espera código real** (TSK-34), misma razón que
+    `test_load_contract_campo_tipo_faltante`: falta la rama `missing` de
+    nivel columna del traductor que compone M-09 con el localizador de
+    archivo + índice de columna.
     """
     texto = (
         "contract_data:\n"
@@ -773,9 +803,80 @@ def test_load_contract_otros_campos_faltantes(
     with pytest.raises(ContractSchemaError) as exc_info:
         load_contract(path)
 
-    mensaje = str(exc_info.value)
-    assert campo_faltante in mensaje
-    assert "1" in mensaje
+    mensaje_esperado = (
+        f"archivo[0] '{_NOMBRE_ARCHIVO_UNICO}', columna de índice 1: "
+        f"falta el campo requerido '{campo_faltante}' (Field required)"
+    )
+    assert str(exc_info.value) == mensaje_esperado
+
+
+def test_load_contract_columna_sin_tipo_m09(
+    write_contract_yaml: Callable[..., Path],
+) -> None:
+    """Caso 16 (TSK-33, CA-15): YAML de **2** archivos donde la columna de
+    índice 1 de `ventas.csv` (índice 1 de `archivos`) omite `tipo` ->
+    `ContractSchemaError` con el texto literal **M-09** exacto
+    (`archivo[1] 'ventas.csv', columna de índice 1: falta el campo
+    requerido 'tipo' (Field required)`): el nombre del archivo aparece
+    **aunque Pydantic no lo reporte** en el `ValidationError` (D-25, hallazgo
+    3) -- se recupera del YAML crudo por índice, igual que en M-06/M-07/M-08.
+
+    YAML sintético (sin PII, C-01): `archivos[0]` (`clientes.csv`) es válido
+    y completo (nombre + una columna completa); `archivos[1]`
+    (`ventas.csv`) declara dos columnas -- la de índice 0 (`venta_id`) es
+    válida y completa, la de índice 1 (`monto`) omite el campo requerido
+    `tipo`. Sin `columnas` residual en la raíz de `contract_data` (para no
+    disparar M-02/M-13, fuera de alcance de este caso).
+
+    Este caso **espera código real** (no es caracterización; plan.md lo
+    lista junto a 1/6/7/8/9/10/11/12/14/16/17/23): hoy `_mensaje_esquema`
+    (`contract.py`) no tiene ninguna rama de **nivel columna** que use
+    `_localizador_archivo` -- solo las ramas de nivel archivo (`len(loc) ==
+    3`) lo invocan. Con `loc == ('archivos', 1, 'columnas', 1, 'tipo')`
+    (`len(loc) == 5`), el `type == 'missing'` cae al `fallback` genérico
+    (`falta el campo requerido 'tipo' en la columna de índice {indice}
+    ({msg})`, con `indice = loc[1] == 1` -- el índice de **archivo**, no de
+    columna, por coincidencia numérica igual a 1 en este fixture, pero sin
+    el localizador `archivo[i] '<nombre>'` ni la coma que exige M-09). La
+    aserción de igualdad exacta de mensaje falla por contenido (formato
+    distinto, sin el prefijo de archivo); no es un `ImportError` ni un
+    error de sintaxis del test, ni un `DID NOT RAISE` (sí se lanza
+    `ContractSchemaError`, solo que con el mensaje equivocado). Es
+    exactamente el defecto que TSK-34 (`tdd_coder`, GREEN) debe cerrar con
+    el cambio de firma `_mensaje_esquema(exc, archivos_crudos)` (ya
+    vigente desde el Caso 9) y una rama `missing` de nivel columna nueva
+    (`loc == ('archivos', i, 'columnas', j, campo)`) que componga M-09 con
+    `_localizador_archivo(i, archivos_crudos)` + `columna de índice {j}`.
+    """
+    texto = (
+        "contract_data:\n"
+        "  archivos:\n"
+        "    - nombre: clientes.csv\n"
+        "      columnas:\n"
+        "        - nombre: cliente_id\n"
+        "          tipo: integer\n"
+        "          nulable: false\n"
+        "          llave: true\n"
+        "    - nombre: ventas.csv\n"
+        "      columnas:\n"
+        "        - nombre: venta_id\n"
+        "          tipo: integer\n"
+        "          nulable: false\n"
+        "          llave: true\n"
+        "        - nombre: monto\n"
+        "          nulable: true\n"
+        "          llave: false\n"
+    )
+    path = write_contract_yaml(texto=texto)
+
+    with pytest.raises(ContractSchemaError) as exc_info:
+        load_contract(path)
+
+    mensaje_esperado = (
+        "archivo[1] 'ventas.csv', columna de índice 1: falta el campo "
+        "requerido 'tipo' (Field required)"
+    )
+    assert str(exc_info.value) == mensaje_esperado
 
 
 def test_load_contract_columnas_vacias_en_archivo_m07(
@@ -846,33 +947,219 @@ def test_load_contract_columnas_vacias_en_archivo_m07(
     assert str(exc_info.value) == mensaje_esperado
 
 
-def test_load_contract_tipo_fuera_de_enum(
+def test_load_contract_archivo_sin_columnas_m08(
     write_contract_yaml: Callable[..., Path],
 ) -> None:
-    """Destino final: Caso 17 (CA-16, M-10): `tipo: numero_magico` (fuera del
-    enum de 6 tipos), dentro de un archivo, -> `ContractSchemaError`
-    (TSK-03: forma migrada).
+    """Caso 13 (TSK-28, CA-12): `archivos[1]` (`ventas.csv`) **omite la
+    clave** `columnas` (a diferencia del Caso 12, donde la clave está
+    presente pero vacía) -> `ContractSchemaError` con el texto literal
+    **M-08** exacto (`archivo[1] 'ventas.csv': falta el campo requerido
+    'columnas' (Field required)`).
 
-    YAML sintético (sin PII, C-01) con dos columnas dentro de un único
-    archivo: la de índice 0 (`test_id`) es válida y completa; la de índice 1
-    (`correo`) declara un `tipo` que no pertenece al enum cerrado de 6
-    valores (D-23b). El mensaje de la excepción debe identificar tres cosas:
-    (a) el **valor inválido** declarado (`numero_magico`), (b) la **columna
-    afectada** por índice (0-based), y (c) enumerar los **6 valores
-    permitidos**. `load_contract` no debe retornar objeto (se lanza la
-    excepción), y ésta debe ser exactamente `ContractSchemaError`, no un
-    `pydantic.ValidationError` crudo.
+    YAML sintético (sin PII, C-01): `archivos[0]` (`clientes.csv`) es válido
+    y completo (nombre + una columna completa); `archivos[1]` declara
+    `nombre: ventas.csv` pero **no** declara la clave `columnas` en
+    absoluto. Sin `columnas` residual en la raíz de `contract_data` (para no
+    disparar M-02/M-13, fuera de alcance de este caso).
+
+    `plan.md` marca TSK-29 (lado de código) como `(car?)` -- candidata a
+    caracterización, "probablemente ya satisfecha por TSK-25, que solo
+    difiere en el campo" -- pero **no** lo es: `_localizador_archivo` (TSK-25)
+    solo se invoca hoy desde dos ramas del traductor, ambas con guarda
+    explícita sobre `loc[2]`: la rama `missing` de nivel archivo exige
+    `loc[2] == "nombre"` (TSK-25, Caso 11) y la rama `value_error` de nivel
+    archivo exige `loc[2] == "columnas"` **con** `tipo_error == "value_error"`
+    (TSK-27, Caso 12, columna presente pero vacía). Aquí Pydantic reporta
+    `type == "missing"` con `loc == ("archivos", 1, "columnas")` (la clave
+    falta, no está vacía): ese `loc` no coincide con ninguna de las dos
+    guardas -- `loc[2] == "columnas"` pero `tipo_error != "value_error"`, y
+    `loc[2] != "nombre"` para la rama `missing`-- así que cae al `fallback`
+    genérico de columna (`columna de índice ?, campo 'columnas': Field
+    required`), sin el localizador `archivo[i] '<nombre>'` que exige M-08.
+    Verificado con inyección temporal (L-10): revirtiendo a mano el guard de
+    la rama `missing` de nivel archivo a `loc[2] in ("nombre", "columnas")`
+    el test pasa a verde, confirmando que el defecto real es la ausencia de
+    esa generalización (o de una rama `missing` propia) en el traductor
+    vigente -- no un defecto de `_localizador_archivo` en sí, que ya
+    funciona igual en ambos casos. La aserción de igualdad exacta de mensaje
+    falla por contenido (`fallback` genérico obtenido vs M-08 esperado); no
+    es un `ImportError` ni un error de sintaxis del test, ni un `DID NOT
+    RAISE` (sí se lanza `ContractSchemaError`, solo que con el mensaje
+    equivocado). Este caso **espera código real**: TSK-29 debe quedar
+    `implementada`, no `cancelada_suspendida`.
     """
     texto = (
         "contract_data:\n"
         "  archivos:\n"
-        f"    - nombre: {_NOMBRE_ARCHIVO_UNICO}\n"
+        "    - nombre: clientes.csv\n"
         "      columnas:\n"
-        "        - nombre: test_id\n"
+        "        - nombre: cliente_id\n"
         "          tipo: integer\n"
         "          nulable: false\n"
         "          llave: true\n"
-        "        - nombre: correo\n"
+        "    - nombre: ventas.csv\n"
+    )
+    path = write_contract_yaml(texto=texto)
+
+    with pytest.raises(ContractSchemaError) as exc_info:
+        load_contract(path)
+
+    mensaje_esperado = (
+        "archivo[1] 'ventas.csv': falta el campo requerido 'columnas' "
+        "(Field required)"
+    )
+    assert str(exc_info.value) == mensaje_esperado
+
+
+def test_load_contract_archivo_duplicado_no_adyacente_m05(
+    write_contract_yaml: Callable[..., Path],
+    clientes_columnas: list[dict],
+    ventas_columnas: list[dict],
+) -> None:
+    """Caso 14 (TSK-30, CA-13): contrato de **3** archivos con la colisión de
+    `nombre` **no adyacente** (`ventas.csv` en el índice 0, `clientes.csv`
+    válido y distinto en el índice 1, `ventas.csv` de nuevo en el índice 2)
+    -> `ContractSchemaError` con el texto literal **M-05** exacto
+    (`nombre de archivo duplicado: 'ventas.csv'`), error de **nivel raíz**
+    (sin prefijo `archivo[i]`); `load_contract` no retorna objeto.
+
+    La no adyacencia es **deliberada** (endurecimiento del gate, paso 9,
+    Riesgo Técnico 7 de `plan.md`): con dos `ventas.csv` **contiguos** en una
+    lista de 2, un detector defectuoso que solo compare el par vecino
+    (`archivos[i].nombre == archivos[i+1].nombre`) pasaría en verde sin ver
+    el duplicado. Al separar las dos apariciones de `ventas.csv` con un
+    archivo válido y distinto (`clientes.csv`) en medio, este test **mata**
+    esa implementación por pares adyacentes: solo un detector que recorra
+    **toda la lista** (p. ej. acumulando un conjunto/contador de los
+    nombres ya vistos) detecta la colisión de los índices 0 y 2.
+
+    Reutiliza `write_contract_yaml` (TSK-01) vía `archivos=` (sin fixtures
+    nuevos en disco, C-01): las columnas de cada archivo son las fixtures
+    sintéticas ya existentes (`ventas_columnas`, `clientes_columnas`),
+    reutilizadas dos veces para las dos apariciones de `ventas.csv` -- el
+    contenido de `columnas` es irrelevante para este comportamiento (la
+    colisión se decide por `nombre` de archivo, cadena exacta, D-25b); lo
+    único que importa es que ambas entradas declaren `nombre: ventas.csv`.
+
+    Estado de producción al momento de escribir este test (RED esperado):
+    `Contract` aún no tiene ningún `field_validator` sobre `archivos` que
+    detecte nombres duplicados (`_archivos_sin_duplicados`, TSK-31, no
+    implementado) -- un YAML de 3 archivos sintácticamente válido con
+    `nombre` repetido hoy carga **sin excepción**, así que se espera que
+    `pytest.raises(ContractSchemaError)` falle con `DID NOT RAISE` (o
+    equivalente), no con un `ImportError` ni un error de sintaxis del test.
+    """
+    archivos = [
+        {"nombre": "ventas.csv", "columnas": ventas_columnas},
+        {"nombre": "clientes.csv", "columnas": clientes_columnas},
+        {"nombre": "ventas.csv", "columnas": ventas_columnas},
+    ]
+    path = write_contract_yaml(archivos=archivos)
+
+    with pytest.raises(ContractSchemaError) as exc_info:
+        load_contract(path)
+
+    mensaje_esperado = "nombre de archivo duplicado: 'ventas.csv'"
+    assert str(exc_info.value) == mensaje_esperado
+
+
+def test_load_contract_mayusculas_no_son_duplicado(
+    write_contract_yaml: Callable[..., Path],
+    ventas_columnas: list[dict],
+) -> None:
+    """Caso 15 (TSK-32, CA-14): `Ventas.csv` y `ventas.csv` difieren **solo**
+    en mayúsculas -> cargan **sin error**, `len(archivos) == 2`.
+
+    `_archivos_sin_duplicados` (TSK-31, Caso 14) compara por **cadena
+    exacta**, sin normalizar (D-25b/D-23e): `"Ventas.csv" != "ventas.csv"`
+    como cadenas Python, así que el conjunto de nombres vistos no los trata
+    como colisión. Este test congela ese comportamiento como contrato: el
+    **riesgo aceptado** de colisión física entre los dos nombres en el
+    sistema de archivos (case-insensitive en Windows/macOS por defecto)
+    queda **diferido a `load_data`** (T-59); esta feature no lo resuelve ni
+    lo detecta -- de hecho, por diseño, los **acepta**.
+
+    Reutiliza `write_contract_yaml` (TSK-01) vía `archivos=` y la fixture
+    sintética `ventas_columnas` ya existente, reutilizada dos veces (el
+    contenido de las columnas es irrelevante para este comportamiento; lo
+    único que importa es el par de nombres que solo difieren en caja) --
+    sin fixtures nuevos en disco (C-01).
+
+    Candidato serio a **caracterización** (L-13/L-14, nota del plan): dado
+    que `_archivos_sin_duplicados` ya compara por cadena exacta desde el
+    Caso 14 (TSK-31), este par probablemente ya carga sin error como efecto
+    colateral del diseño, sin necesitar ningún cambio de producción nuevo
+    (TSK-32 es la única tarea de este caso; no hay tarea de código
+    hermana). Si `pytest` confirma verde inmediato, la honestidad de este
+    test se verifica por inyección/reversión temporal de una comparación
+    normalizada (case-insensitive) en `_archivos_sin_duplicados`
+    (`app/src/zeroleak/config/contract.py`) y no se fuerza un RED
+    artificial.
+    """
+    archivos = [
+        {"nombre": "Ventas.csv", "columnas": ventas_columnas},
+        {"nombre": "ventas.csv", "columnas": ventas_columnas},
+    ]
+    path = write_contract_yaml(archivos=archivos)
+
+    contrato = load_contract(path)
+
+    assert len(contrato.archivos) == 2
+    assert [a.nombre for a in contrato.archivos] == ["Ventas.csv", "ventas.csv"]
+
+
+def test_load_contract_tipo_fuera_de_enum(
+    write_contract_yaml: Callable[..., Path],
+) -> None:
+    """Caso 17 (TSK-35, CA-16, M-10, endurecido): YAML de **2** archivos
+    donde la columna de índice 1 de `ventas.csv` (índice 1 de `archivos`)
+    declara `tipo: numero_magico`, fuera del enum cerrado de 6 valores
+    (D-23b) -> `ContractSchemaError` con el texto literal **M-10** exacto
+    (`archivo[1] 'ventas.csv', columna de índice 1, campo 'tipo': valor
+    'numero_magico' inválido (Input should be 'string', 'integer', 'float',
+    'date', 'datetime' or 'boolean')`).
+
+    Endurecimiento (TSK-03, forma migrada -> forma final): la forma migrada
+    solo verificaba subcadenas (`numero_magico`, `1`, los 6 tipos sueltos en
+    el mensaje). Esta forma exige **igualdad exacta** con M-10, que compone
+    el localizador de archivo (`archivo[1] 'ventas.csv'`), el índice de
+    columna (`columna de índice 1`), el campo (`campo 'tipo'`), el valor
+    inválido (`valor 'numero_magico' inválido`) y el mensaje nativo de
+    Pydantic que ya enumera los 6 tipos permitidos entre paréntesis -- igual
+    patrón de composición que M-09 (Caso 16).
+
+    YAML sintético (sin PII, C-01): `archivos[0]` (`clientes.csv`) es válido
+    y completo (nombre + una columna completa); `archivos[1]` (`ventas.csv`)
+    declara dos columnas -- la de índice 0 (`venta_id`) es válida y
+    completa, la de índice 1 (`monto`) declara `tipo: numero_magico`, fuera
+    del enum. Sin `columnas` residual en la raíz de `contract_data` (para no
+    disparar M-02/M-13, fuera de alcance de este caso).
+
+    Este caso **espera código real** (TSK-36, `tdd_coder`, GREEN): hoy
+    `_mensaje_esquema` (`contract.py`) no tiene ninguna rama de **nivel
+    columna** para `type == 'enum'` -- solo el `fallback` genérico atrapa el
+    error de enum, sin componer el localizador de archivo ni el índice de
+    columna. La aserción de igualdad exacta de mensaje falla por contenido
+    (formato distinto, sin el prefijo de archivo); no es un `ImportError` ni
+    un error de sintaxis del test, ni un `DID NOT RAISE` (sí se lanza
+    `ContractSchemaError`, solo que con el mensaje equivocado).
+    """
+    texto = (
+        "contract_data:\n"
+        "  archivos:\n"
+        "    - nombre: clientes.csv\n"
+        "      columnas:\n"
+        "        - nombre: cliente_id\n"
+        "          tipo: integer\n"
+        "          nulable: false\n"
+        "          llave: true\n"
+        "    - nombre: ventas.csv\n"
+        "      columnas:\n"
+        "        - nombre: venta_id\n"
+        "          tipo: integer\n"
+        "          nulable: false\n"
+        "          llave: true\n"
+        "        - nombre: monto\n"
         "          tipo: numero_magico\n"
         "          nulable: true\n"
         "          llave: false\n"
@@ -882,11 +1169,12 @@ def test_load_contract_tipo_fuera_de_enum(
     with pytest.raises(ContractSchemaError) as exc_info:
         load_contract(path)
 
-    mensaje = str(exc_info.value)
-    assert "numero_magico" in mensaje
-    assert "1" in mensaje
-    for tipo_valido in TIPOS_PERMITIDOS:
-        assert tipo_valido in mensaje
+    mensaje_esperado = (
+        "archivo[1] 'ventas.csv', columna de índice 1, campo 'tipo': valor "
+        "'numero_magico' inválido (Input should be 'string', 'integer', "
+        "'float', 'date', 'datetime' or 'boolean')"
+    )
+    assert str(exc_info.value) == mensaje_esperado
 
 
 def test_load_contract_duplicados_exactos(

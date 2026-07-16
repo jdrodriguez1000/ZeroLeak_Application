@@ -5,7 +5,8 @@ contrato (única ruta que abre; frontera D-21), lo parsea con `yaml.safe_load`
 y valida su esquema con Pydantic, devolviendo un `Contract` tipado en memoria.
 
 Nota (paso 10, GREEN, TSK-09/TSK-13/TSK-15/TSK-17/TSK-19/TSK-20/TSK-21/TSK-22/
-TSK-23/TSK-25/TSK-27): esta versión cubre el camino feliz (CA-01 a CA-03:
+TSK-23/TSK-25/TSK-27/TSK-29/TSK-30/TSK-31/TSK-33/TSK-34): esta versión cubre
+el camino feliz (CA-01 a CA-03:
 count, orden, fidelidad de campos y los 6 tipos del enum), la traducción de
 esquema para campo requerido faltante (CA-04/CA-05, fail-fast,
 `_mensaje_esquema`), para `tipo` fuera del enum cerrado (CA-06), para
@@ -25,11 +26,23 @@ YAML sintácticamente inválido, que se distingue como `ContractParseError`
 antes de llegar al esquema, con un mensaje accionable que antecede el
 detalle crudo de PyYAML (CA-07/CA-08), y para un archivo sin `nombre` dentro
 de `archivos[]` (CA-10, M-06 exacto, `_localizador_archivo` degradando
-limpio a `archivo[i]` cuando no hay nombre que mostrar, D-25a).
+limpio a `archivo[i]` cuando no hay nombre que mostrar, D-25a), y para un
+archivo que omite por completo la clave `columnas` (CA-12, M-08 exacto,
+misma rama `missing` de nivel archivo que M-06, con el guard ampliado a
+`loc[2] in ("nombre", "columnas")`), y para `nombre` de archivo duplicado
+por cadena exacta, sobre TODA la lista de `archivos` y no solo pares
+adyacentes (CA-13, M-05 exacto, `_archivos_sin_duplicados`: mismo patrón
+conjunto/contador que `_columnas_sin_duplicados`, sin normalizar
+mayúsculas ni espacios, D-25b/D-23e), y para un campo requerido faltante
+dentro de una columna concreta de un archivo concreto (CA-15, M-09 exacto,
+rama `missing` de nivel columna con `loc == ("archivos", i, "columnas", j,
+campo)`), que localiza el archivo con el mismo `_localizador_archivo`
+usado por las ramas de nivel archivo y le antepone `columna de índice {j}`,
+de modo que el nombre del archivo aparece en el mensaje aunque Pydantic no
+lo reporte en su propio `loc`.
 Queda pendiente el fail-fast ante violaciones múltiples de distinta
-naturaleza (CA-14) y las caracterizaciones aún no escritas de la frontera de
-lectura (CA-12), la invocación directa sin CLI (CA-13) y los fixtures
-sintéticos sin PII (CA-15).
+naturaleza y las caracterizaciones aún no escritas de la frontera de
+lectura, la invocación directa sin CLI y los fixtures sintéticos sin PII.
 """
 from __future__ import annotations
 
@@ -111,6 +124,26 @@ class Contract(BaseModel):
         """Rechaza `archivos: []` (CA-06/CA-07); mensaje estable M-04."""
         if not valor:
             raise ValueError("la lista de archivos no puede estar vacía")
+        return valor
+
+    @field_validator("archivos")
+    @classmethod
+    def _archivos_sin_duplicados(cls, valor: list[ArchivoContrato]) -> list[ArchivoContrato]:
+        """Rechaza `nombre` de archivo duplicado sobre TODA la lista (CA-13, M-05).
+
+        Recorre la lista completa acumulando un conjunto de nombres ya
+        vistos (no compara solo pares adyacentes, Riesgo Técnico 7), por
+        cadena exacta, sin normalizar (D-25b/D-23e).
+        """
+        vistos: set[str] = set()
+        duplicados: list[str] = []
+        for archivo in valor:
+            if archivo.nombre in vistos and archivo.nombre not in duplicados:
+                duplicados.append(archivo.nombre)
+            vistos.add(archivo.nombre)
+        if duplicados:
+            nombres = ", ".join(f"'{n}'" for n in duplicados)
+            raise ValueError(f"nombre de archivo duplicado: {nombres}")
         return valor
 
 
@@ -258,10 +291,18 @@ def _mensaje_esquema(exc: ValidationError, archivos_crudos: list) -> str:
       al mensaje del validador, sin la envoltura genérica de "columna de
       índice ..., campo ..." que no aplica (el error no es de una columna
       concreta, sino del campo `columnas` del archivo entero).
-    - `missing` de nivel archivo (`loc == ("archivos", i, "nombre")`): CA-10,
-      M-06. El archivo no declara `nombre`; se localiza con
-      `_localizador_archivo(i, archivos_crudos)`, que degrada limpio a
-      `archivo[i]` (D-25a) porque justo el campo que falta es el `nombre`.
+    - `missing` de nivel archivo (`loc == ("archivos", i, "nombre")` o `loc ==
+      ("archivos", i, "columnas")`): CA-10 (M-06, falta `nombre`) y CA-12
+      (M-08, falta la clave `columnas` por completo, a diferencia de CA-11
+      donde la clave está presente pero vacía). Ambos casos se localizan con
+      `_localizador_archivo(i, archivos_crudos)`; para `nombre` degrada
+      limpio a `archivo[i]` (D-25a) porque justo el campo que falta es el
+      `nombre`.
+    - `missing` de nivel columna (`loc == ("archivos", i, "columnas", j,
+      campo)`): CA-15, M-09. Cualquier campo requerido de `Columna` (`nombre`,
+      `tipo`, `nulable`, `llave`) ausente en la columna `j` del archivo `i`;
+      se localiza con `_localizador_archivo(i, archivos_crudos)` y se agrega
+      `columna de índice {j}` antes de nombrar el campo faltante.
     - fallback genérico: cualquier otro `type` de error de Pydantic no
       cubierto arriba todavía.
     """
@@ -277,13 +318,43 @@ def _mensaje_esquema(exc: ValidationError, archivos_crudos: list) -> str:
     if tipo_error == "value_error" and len(loc) == 3 and loc[0] == "archivos" and loc[2] == "columnas":
         localizador = _localizador_archivo(indice, archivos_crudos)
         return f"{localizador}: {msg.removeprefix('Value error, ')}"
-    if tipo_error == "missing" and len(loc) == 3 and loc[0] == "archivos" and loc[2] == "nombre":
+    if (
+        tipo_error == "missing"
+        and len(loc) == 3
+        and loc[0] == "archivos"
+        and loc[2] in ("nombre", "columnas")
+    ):
         localizador = _localizador_archivo(indice, archivos_crudos)
         return f"{localizador}: falta el campo requerido '{campo}' ({msg})"
+    if (
+        tipo_error == "missing"
+        and len(loc) == 5
+        and loc[0] == "archivos"
+        and loc[2] == "columnas"
+    ):
+        localizador = _localizador_archivo(indice, archivos_crudos)
+        indice_columna = loc[3]
+        return (
+            f"{localizador}, columna de índice {indice_columna}: falta el "
+            f"campo requerido '{campo}' ({msg})"
+        )
     if tipo_error == "missing":
         return (
             f"falta el campo requerido '{campo}' en la columna de índice {indice} "
             f"({msg})"
+        )
+    if (
+        tipo_error == "enum"
+        and len(loc) == 5
+        and loc[0] == "archivos"
+        and loc[2] == "columnas"
+    ):
+        localizador = _localizador_archivo(indice, archivos_crudos)
+        indice_columna = loc[3]
+        valor_invalido = primer_error.get("input", "?")
+        return (
+            f"{localizador}, columna de índice {indice_columna}, campo "
+            f"'{campo}': valor '{valor_invalido}' inválido ({msg})"
         )
     if tipo_error == "enum":
         valor_invalido = primer_error.get("input", "?")

@@ -282,6 +282,91 @@
             "tareas": [],
             "desc": "Paso 10 (tdd_refactor) sobre el Caso 12: pytest confirma GREEN de partida (97 passed / 5 failed, mismo conjunto rojo preexistente de los Casos 16/17). Evaluada explicitamente la duplicacion local senalada por la sesion principal: la nueva rama value_error de nivel archivo (TSK-27, loc==('archivos', i, 'columnas')) comparte con la rama missing de nivel archivo ya existente (TSK-25, Caso 11, loc==('archivos', i, 'nombre')) el mismo guard `len(loc) == 3 and loc[0] == 'archivos'` y el mismo uso de `_localizador_archivo`. Se decidio NO extraer un helper comun (p. ej. un `_loc_es_nivel_archivo(loc, campo)`) porque con solo 2 usuarios la abstraccion es prematura (E4/NC-2) y es exactamente el tipo de consolidacion que el plan reserva para TSK-48 (constantes M-01..M-13 + helpers del traductor por nivel de loc, diferido a los ultimos casos); forzarla aqui adelantaria ese refactor global antes de conocer la forma final de las ramas restantes (Casos 13-18), arriesgando una generalizacion equivocada que TSK-48 tendria que deshacer. Unica limpieza aplicada, siguiendo el precedente de los refactors de los Casos 1/7/8/9/10/11: el docstring de cabecera del modulo (contract.py, lineas 1-31) describia `columnas: []`/ausente (CA-11) solo con el field_validator generico `_columnas_no_vacias`, sin mencionar que este Caso 12 anadio el mensaje M-07 exacto con localizacion por indice + nombre (`_localizador_archivo`); se actualizo el parrafo para reflejarlo con precision, incluyendo TSK-25/TSK-27 en la lista de TSK del encabezado. No se toco codigo de produccion (ninguna rama, mensaje, firma publica ni el traductor `_mensaje_esquema` mas alla de lo ya hecho por el coder). pytest final: 97 passed / 5 failed, mismo conjunto rojo exacto (test_load_contract_campo_tipo_faltante, test_load_contract_otros_campos_faltantes x3, test_load_contract_tipo_fuera_de_enum), sin regresiones. Caso 12 queda cerrado (tester+coder+refactor); el bucle continua con el Caso 13 (tdd_tester)."
           }
+        },
+        {
+          "id": 13,
+          "desc": "archivos[1] 'ventas.csv' sin la clave columnas -> M-08 exacto.",
+          "trazabilidad": ["CA-12"],
+          "tester": {
+            "status": "red_confirmado",
+            "tareas": ["TSK-28"],
+            "desc": "TSK-28: test nuevo test_load_contract_archivo_sin_columnas_m08 (app/tests/test_contract_multifile.py), fixture cruda de 2 archivos: archivos[0] (clientes.csv) valido y completo; archivos[1] declara nombre: ventas.csv pero OMITE por completo la clave columnas. Verifica ContractSchemaError con el texto M-08 literal por igualdad exacta (archivo[1] 'ventas.csv': falta el campo requerido 'columnas' (Field required)). RED confirmado por la razon correcta: el fallback generico de columna se dispara ('falta el campo requerido columnas en la columna de indice 1') en vez de M-08 con el localizador; AssertionError de mensaje, no ImportError ni DID NOT RAISE. Honestidad L-10: pese a que TSK-29 estaba marcada (car?), la inyeccion temporal (generalizar loc[2] in ('nombre','columnas') en la rama missing de nivel archivo) hizo pasar el test, confirmando que el defecto es REAL (falta la generalizacion en _mensaje_esquema, no un problema de _localizador_archivo); revertida de inmediato, git diff de produccion vacio. Suite completa: 97 passed / 6 failed (5 rojos legitimos preexistentes de los Casos 16/17 + el nuevo RED del Caso 13). NOTA: nodo RECONSTRUIDO por la sesion principal tras el incidente de perdida de state.json (git checkout accidental por el tdd_coder del Caso 17); el codigo de produccion y los tests estaban intactos, solo se perdio el tracking."
+          },
+          "coder": {
+            "status": "green_confirmado",
+            "tareas": ["TSK-29"],
+            "desc": "Paso 10 (tdd_coder) sobre el Caso 13: en app/src/zeroleak/config/contract.py, _mensaje_esquema, se amplio la guarda de la rama missing de nivel archivo de loc[2]=='nombre' a loc[2] in ('nombre','columnas'), reutilizando el mismo formato de mensaje y el mismo _localizador_archivo (TSK-25) que ya usaba para M-06; con campo=='columnas' el mensaje compuesto coincide con M-08 exacto. Se actualizo el bullet correspondiente del docstring de _mensaje_esquema. Pese a la etiqueta (car?) del plan, el defecto era REAL (verificado por el tester via inyeccion/reversion L-10), asi que TSK-29 queda implementada CON entregable, no cancelada_suspendida. pytest app/tests -q -> 98 passed, 5 failed (mismo conjunto rojo preexistente de los Casos 16/17; el test del Caso 13 pasa a verde, +1 sin regresion). NOTA: nodo RECONSTRUIDO tras el incidente de perdida de state.json."
+          },
+          "refactor": {
+            "status": "aplicado",
+            "tareas": [],
+            "desc": "Paso 10 (tdd_refactor) sobre el Caso 13: GREEN de partida 98 passed / 5 failed. Evaluada la duplicacion: la guarda ampliada loc[2] in ('nombre','columnas') tiene solo 2 valores en una tupla autoexplicativa; no hay logica repetida que extraer, un helper seria abstraccion prematura (E4/NC-2) reservada a TSK-48. Unica limpieza: sincronizacion del docstring de cabecera del modulo con CA-12/M-08 (TSK-29 anadida a la lista) y retiro de una referencia numerica CA-12 vieja/stale en el parrafo de pendientes. Sin cambios en _mensaje_esquema, mensajes ni firmas. pytest final: 98 passed / 5 failed, sin regresiones. Caso 13 cerrado (tester+coder+refactor). NOTA: nodo RECONSTRUIDO tras el incidente de perdida de state.json."
+          }
+        },
+        {
+          "id": 14,
+          "desc": "ventas.csv, clientes.csv, ventas.csv: duplicado no adyacente (indices 0 y 2, cadena exacta) -> M-05 exacto, sin prefijo archivo[i].",
+          "trazabilidad": ["CA-13"],
+          "tester": {
+            "status": "red_confirmado",
+            "tareas": ["TSK-30"],
+            "desc": "TSK-30: test nuevo test_load_contract_archivo_duplicado_no_adyacente_m05 (app/tests/test_contract_multifile.py), contrato sintetico de 3 archivos via write_contract_yaml (TSK-01, sin fixtures nuevos en disco): ventas.csv (indice 0), clientes.csv (indice 1, valido y distinto), ventas.csv de nuevo (indice 2). Colision NO ADYACENTE deliberada (Riesgo Tecnico 7 del plan) para matar un detector que solo compare pares vecinos. Verifica ContractSchemaError con el texto M-05 literal por igualdad exacta (nombre de archivo duplicado: 'ventas.csv'), error de nivel raiz sin prefijo archivo[i]. RED confirmado por la razon correcta: DID NOT RAISE ContractSchemaError (Contract aun no tiene field_validator de duplicados de archivo; el YAML carga sin excepcion). Suite completa: 98 passed / 6 failed (5 rojos legitimos preexistentes de los Casos 16/17 + el nuevo). NOTA: nodo RECONSTRUIDO tras el incidente de perdida de state.json."
+          },
+          "coder": {
+            "status": "green_confirmado",
+            "tareas": ["TSK-31"],
+            "desc": "Paso 10 (tdd_coder) sobre el Caso 14: en app/src/zeroleak/config/contract.py se agrego el field_validator _archivos_sin_duplicados a Contract (despues de _archivos_no_vacia): recorre TODA la lista de archivos acumulando un set() de nombres vistos (no compara pares adyacentes, satisfaciendo el endurecimiento del Riesgo Tecnico 7), compara por cadena exacta sin normalizar (D-25b/D-23e), y levanta ValueError('nombre de archivo duplicado: ...') (M-05). No fue necesario tocar _mensaje_esquema ni _localizador_archivo: la rama de nivel raiz ya existente (value_error con loc in (('columnas',),('archivos',))) ya propaga M-05 sin prefijo archivo[i], mismo mecanismo que M-04. pytest app/tests -q -> 99 passed, 5 failed (mismo conjunto rojo preexistente de los Casos 16/17; el test del Caso 14 pasa a verde, +1 sin regresion). Verificado que _archivos_no_vacia (M-04) sigue disparando (fail-fast D-23c, ambos validadores coexisten sin pisarse). NOTA: nodo RECONSTRUIDO tras el incidente de perdida de state.json."
+          },
+          "refactor": {
+            "status": "aplicado",
+            "tareas": [],
+            "desc": "Paso 10 (tdd_refactor) sobre el Caso 14: GREEN de partida 99 passed / 5 failed. Evaluada la extraccion a helper compartido entre _archivos_sin_duplicados (nuevo) y _columnas_sin_duplicados (existente): se decidio NO extraer -- con solo 2 usuarios la abstraccion es prematura (E4/NC-2), generalizar sobre el atributo variable (columna.nombre vs archivo.nombre) exigiria un extractor tipo getattr/lambda que anade indireccion sin reducir complejidad real; consolidacion reservada a TSK-48. Unica limpieza: se anadio al docstring de cabecera del modulo el parrafo de cobertura de CA-13/M-05 (_archivos_sin_duplicados, TSK-30/TSK-31) y se retiro una etiqueta numerica CA-13 stale del parrafo de pendientes. Sin cambios en codigo de produccion. pytest final: 99 passed / 5 failed, sin regresiones. Caso 14 cerrado (tester+coder+refactor). NOTA: nodo RECONSTRUIDO tras el incidente de perdida de state.json."
+          }
+        },
+        {
+          "id": 15,
+          "desc": "Ventas.csv vs ventas.csv -> cargan sin error, len(archivos)==2 (riesgo aceptado, T-59).",
+          "trazabilidad": ["CA-14"],
+          "tester": {
+            "status": "caracterizacion_verde",
+            "tareas": ["TSK-32"],
+            "desc": "TSK-32: test nuevo test_load_contract_mayusculas_no_son_duplicado (app/tests/test_contract_multifile.py), contrato con Ventas.csv y ventas.csv (difieren solo en mayusculas) via write_contract_yaml -> cargan sin error, len(archivos)==2 (comparacion exacta, D-25b). Congela el riesgo aceptado de colision fisica, diferido a load_data (T-59). Caracterizacion verde de inmediato (no RED artificial): _archivos_sin_duplicados (Caso 14) ya compara por cadena exacta, asi que Ventas.csv y ventas.csv son dos archivos distintos como efecto colateral del diseno. Honestidad L-10: inyeccion temporal de comparacion case-insensitive (clave = archivo.nombre.lower()) en _archivos_sin_duplicados -> el test paso a FAILED (ContractSchemaError: nombre de archivo duplicado: 'ventas.csv'), confirmando que el test detecta el defecto y no es vacuo; revertida de inmediato, git diff limpio. Suite completa: 100 passed / 5 failed (5 rojos legitimos preexistentes de los Casos 16/17, +1 verde). Caso 15 cerrado SIN fase tdd_coder: TSK-32 es la unica tarea del caso (no hay tarea de codigo hermana). NOTA: nodo RECONSTRUIDO tras el incidente de perdida de state.json."
+          }
+        },
+        {
+          "id": 16,
+          "desc": "Columna de indice 1 de ventas.csv sin tipo -> M-09 exacto: el archivo aparece aunque Pydantic no lo reporte.",
+          "trazabilidad": ["CA-15"],
+          "tester": {
+            "status": "red_confirmado",
+            "tareas": ["TSK-33"],
+            "desc": "TSK-33: test nuevo test_load_contract_columna_sin_tipo_m09 (app/tests/test_contract_multifile.py): YAML de 2 archivos, archivos[1] (ventas.csv) con columna de indice 1 sin tipo -> ContractSchemaError con el texto M-09 literal por igualdad exacta (archivo[1] 'ventas.csv', columna de indice 1: falta el campo requerido 'tipo' (Field required)). Ademas se ENDURECIERON al texto literal M-09 los tests migrados de campos faltantes: test_load_contract_campo_tipo_faltante y test_load_contract_otros_campos_faltantes (x3, nombre/nulable/llave), que pasaron de asertos de subcadena al M-09 exacto sobre el fixture de un solo archivo. No se toco test_load_contract_tipo_fuera_de_enum (Caso 17/M-10). RED confirmado por la razon correcta: _mensaje_esquema no tiene rama de nivel columna (loc con len==5), cae al fallback generico sin el localizador archivo[i]; AssertionError de mensaje. Suite completa: 100 passed / 6 failed (5 del Caso 16 -- los 4 endurecidos + el nuevo -- y 1 del Caso 17). NOTA: nodo RECONSTRUIDO tras el incidente de perdida de state.json."
+          },
+          "coder": {
+            "status": "green_confirmado",
+            "tareas": ["TSK-34"],
+            "desc": "Paso 10 (tdd_coder) sobre el Caso 16: se verifico que la firma _mensaje_esquema(exc, archivos_crudos) ya estaba vigente desde el Caso 9/11 (no se toco). Se anadio una rama nueva missing de NIVEL COLUMNA en _mensaje_esquema: tipo_error=='missing' and len(loc)==5 and loc[0]=='archivos' and loc[2]=='columnas', con loc==('archivos', i, 'columnas', j, campo); compone M-09 con _localizador_archivo(i, archivos_crudos) + 'columna de indice {j}' + el campo faltante, colocada antes de la rama fallback generica de columna. Se amplio el docstring de _mensaje_esquema. pytest app/tests -q -> 105 passed, 1 failed. El unico rojo restante es test_load_contract_tipo_fuera_de_enum (Caso 17, rama enum de columna, M-10), fuera de alcance. Sin regresiones. NOTA: nodo RECONSTRUIDO tras el incidente de perdida de state.json."
+          },
+          "refactor": {
+            "status": "aplicado",
+            "tareas": [],
+            "desc": "Paso 10 (tdd_refactor) sobre el Caso 16: GREEN de partida 105 passed / 1 failed (el rojo es el Caso 17). Evaluada la sugerencia de compartir estructura entre la rama nueva de nivel columna y la de nivel archivo via _localizador_archivo: las 3 ramas que localizan un archivo ya invocan el mismo _localizador_archivo; lo unico que varia son los guards y una linea de sufijo del f-string por rama. Extraer un helper adicional solo para eso anadiria indireccion sin reducir duplicacion real; reservado a TSK-48 (E4/NC-2, mismo criterio que Casos 12/13/14). Unica limpieza: se completo la lista de TSK del docstring de cabecera (faltaban TSK-30/31 del Caso 14 y TSK-33/34 de este) y se describio la nueva rama missing de nivel columna (CA-15/M-09). Sin cambios en codigo de produccion. pytest final: 105 passed / 1 failed, sin regresiones. Caso 16 cerrado (tester+coder+refactor). NOTA: nodo RECONSTRUIDO tras el incidente de perdida de state.json."
+          }
+        },
+        {
+          "id": 17,
+          "desc": "tipo: numero_magico en ventas.csv -> M-10 exacto (archivo, columna, valor y los 6 permitidos).",
+          "trazabilidad": ["CA-16"],
+          "tester": {
+            "status": "red_confirmado",
+            "tareas": ["TSK-35"],
+            "desc": "TSK-35: se endurecio test_load_contract_tipo_fuera_de_enum (app/tests/test_contract_multifile.py) -- unico rojo de la suite (105/1). Fixture reescrito de un solo archivo a un YAML de 2 archivos (patron del Caso 16): clientes.csv valido + ventas.csv con columna de indice 1 (monto) declarando tipo: numero_magico. Asercion cambiada de subcadena a igualdad exacta contra el texto M-10 literal de spec.md (archivo[1] 'ventas.csv', columna de indice 1, campo 'tipo': valor 'numero_magico' invalido (Input should be 'string', 'integer', 'float', 'date', 'datetime' or 'boolean')). RED confirmado por la razon correcta: el fallback de _mensaje_esquema produce el mensaje SIN el prefijo localizador archivo[1] 'ventas.csv'; AssertionError de mensaje. Suite completa: 105 passed / 1 failed (sin regresion, misma cardinalidad). NOTA: nodo RECONSTRUIDO tras el incidente de perdida de state.json."
+          },
+          "coder": {
+            "status": "green_confirmado",
+            "tareas": ["TSK-36"],
+            "desc": "Paso 10 (tdd_coder) sobre el Caso 17: en app/src/zeroleak/config/contract.py se agrego una rama enum de NIVEL COLUMNA en _mensaje_esquema, antes del fallback generico de enum: tipo_error=='enum' and len(loc)==5 and loc[0]=='archivos' and loc[2]=='columnas'; compone M-10 con _localizador_archivo(indice, archivos_crudos) + 'columna de indice {loc[3]}' + 'campo {campo!r}' + el input invalido + el mensaje nativo de Pydantic (que ya enumera los 6 tipos). pytest app/tests -q -> 106 passed, 0 failed (TODA la suite verde). Sin regresiones. INCIDENTE: durante esta fase el subagente tdd_coder provoco una PERDIDA DE DATOS -- al intentar patchear state.json con un script json.dump que reformateo el archivo, ejecuto 'git checkout -- state.json' que revirtio el archivo a HEAD (commit 99337b6, solo Casos 1-12), descartando el tracking no commiteado de los Casos 13-17. El codigo de produccion (contract.py) y los tests quedaron intactos y verdes; solo se perdio el tracking de state.json, RECONSTRUIDO despues por la sesion principal a partir de los reportes de los subagentes. La fase refactor del Caso 17 quedo PENDIENTE al momento del incidente."
+          }
         }
       ]
     },
