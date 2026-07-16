@@ -1063,6 +1063,68 @@ def test_load_contract_archivo_duplicado_no_adyacente_m05(
     assert str(exc_info.value) == mensaje_esperado
 
 
+def test_load_contract_tipo_fuera_de_enum_archivo_del_medio(
+    write_contract_yaml: Callable[..., Path],
+    clientes_columnas: list[dict],
+    catalogo_columnas: list[dict],
+) -> None:
+    """Caso 17b (TSK-35b, CA-16, M-10): contrato de **3** archivos donde el
+    defecto (`tipo: numero_magico`) vive en `archivos[1]` (`ventas.csv`, el
+    archivo del **medio**), con `catalogo.csv` **válido detrás**, en
+    `archivos[2]` -> `ContractSchemaError` con el MISMO texto literal M-10
+    de la spec (`archivo[1] 'ventas.csv', columna de índice 1, campo 'tipo':
+    valor 'numero_magico' inválido (Input should be 'string', 'integer',
+    'float', 'date', 'datetime' or 'boolean')`).
+
+    Cierra el hueco de cobertura de N >= 3 sobre el localizador de nivel
+    columna (gate paso 9, riesgo técnico 7 del plan): el Caso 17 solo
+    ejercitaba `archivos[1]` cuando 1 era **también** el índice del último
+    archivo de una lista de 2, así que un off-by-one o una implementación
+    que reporte "el último archivo" en vez del archivo realmente defectuoso
+    pasaba igual. Aquí el índice reportado (1) ya NO coincide con el del
+    último archivo (2, `catalogo.csv`, válido): si el localizador reportara
+    el último en vez del índice real del error, el mensaje apuntaría a
+    `archivo[2] 'catalogo.csv'` en vez de `archivo[1] 'ventas.csv'` y la
+    aserción de igualdad exacta fallaría.
+
+    `ventas.csv` reutiliza la misma forma de 2 columnas que el Caso 17
+    (`venta_id` válido en índice 0, `monto` con `tipo: numero_magico` en
+    índice 1) para conservar el M-10 literal exacto de la spec. `clientes.csv`
+    (`clientes_columnas`) y `catalogo.csv` (`catalogo_columnas`) son válidos y
+    completos. Reutiliza `write_contract_yaml` (TSK-01) vía `archivos=`; sin
+    fixtures nuevos en disco (C-01).
+
+    Candidato serio a **caracterización** (L-13/L-14, nota del plan): el lado
+    de código (TSK-25, localizador `_localizador_archivo`; TSK-36, rama enum
+    de nivel columna en `_mensaje_esquema`) ya existe del Caso 17 y ya usa el
+    índice real del error (`loc[1]`), no "el último archivo". Si `pytest`
+    confirma verde inmediato, la honestidad de este test se verifica por
+    inyección/reversión temporal (L-10) de una localización espuria por
+    "último archivo" (`len(archivos_crudos) - 1`) y no se fuerza un RED
+    artificial.
+    """
+    ventas_defectuoso = [
+        {"nombre": "venta_id", "tipo": "integer", "nulable": False, "llave": True},
+        {"nombre": "monto", "tipo": "numero_magico", "nulable": True, "llave": False},
+    ]
+    archivos = [
+        {"nombre": "clientes.csv", "columnas": clientes_columnas},
+        {"nombre": "ventas.csv", "columnas": ventas_defectuoso},
+        {"nombre": "catalogo.csv", "columnas": catalogo_columnas},
+    ]
+    path = write_contract_yaml(archivos=archivos)
+
+    with pytest.raises(ContractSchemaError) as exc_info:
+        load_contract(path)
+
+    mensaje_esperado = (
+        "archivo[1] 'ventas.csv', columna de índice 1, campo 'tipo': valor "
+        "'numero_magico' inválido (Input should be 'string', 'integer', "
+        "'float', 'date', 'datetime' or 'boolean')"
+    )
+    assert str(exc_info.value) == mensaje_esperado
+
+
 def test_load_contract_mayusculas_no_son_duplicado(
     write_contract_yaml: Callable[..., Path],
     ventas_columnas: list[dict],
@@ -1180,28 +1242,51 @@ def test_load_contract_tipo_fuera_de_enum(
 def test_load_contract_duplicados_exactos(
     write_contract_yaml: Callable[..., Path],
 ) -> None:
-    """Destino final: Caso 18 (CA-17, M-11): dos columnas con `nombre`
-    idéntico (cadena exacta) dentro de un mismo archivo -> `ContractSchemaError`
-    que nombra el duplicado (TSK-03: forma migrada).
+    """Destino final: Caso 18 (CA-17, M-11, endurecido): `ventas.csv`
+    declara dos veces la columna `venta_id` dentro de un YAML de **2**
+    archivos -> `ContractSchemaError` con el texto literal **M-11** exacto
+    (`archivo[1] 'ventas.csv': nombre de columna duplicado: 'venta_id'`).
 
-    YAML sintético (sin PII, C-01) con dos columnas, ambas válidas y
-    completas, pero con el mismo `nombre` exacto (`test_id`) declarado dos
-    veces dentro de un único archivo (D-23e: comparación de cadena exacta,
-    sin normalizar mayúsculas ni espacios). El mensaje de la excepción debe
-    nombrar el `nombre` duplicado (`test_id`); `load_contract` no debe
-    retornar objeto (se lanza la excepción), y ésta debe ser exactamente
-    `ContractSchemaError`, no un `pydantic.ValidationError` crudo.
+    Endurecimiento (TSK-37, forma migrada -> forma final): la forma migrada
+    solo verificaba `"test_id" in mensaje` (subcadena, con un fixture de un
+    solo archivo, sin localizador). Esta forma exige **igualdad exacta** con
+    M-11, que compone el localizador de archivo (`archivo[1] 'ventas.csv'`,
+    D-25a) antepuesto al mensaje del validador mudado a `ArchivoContrato`
+    (`_columnas_sin_duplicados`), mismo patrón de composición que M-07
+    (Caso 12): ambos comparten la rama `value_error` de nivel archivo con
+    `loc == ("archivos", i, "columnas")` en `_mensaje_esquema`.
+
+    YAML sintético (sin PII, C-01): `archivos[0]` (`clientes.csv`) es válido
+    y completo (nombre + una columna completa); `archivos[1]` (`ventas.csv`)
+    declara dos columnas con el mismo `nombre` exacto (`venta_id`, D-23e:
+    comparación de cadena exacta, sin normalizar mayúsculas ni espacios).
+
+    Candidato a **caracterización** (nota del plan, L-13/L-14): el
+    validador `_columnas_sin_duplicados` ya vive en `ArchivoContrato` desde
+    el Caso 1 (TSK-05) y la rama `value_error` de nivel archivo de
+    `_mensaje_esquema` ya antepone `_localizador_archivo` desde el Caso 12
+    (TSK-27, M-07). Es probable que el mensaje M-11 ya salga correcto por
+    efecto colateral de ambos, sin código de producción nuevo (TSK-38 queda
+    `(car?)`). Si `pytest` confirma verde inmediato, no es un `ImportError`
+    ni un error de sintaxis del test: es una aserción de igualdad exacta que
+    ya se cumple con el código vigente.
     """
     texto = (
         "contract_data:\n"
         "  archivos:\n"
-        f"    - nombre: {_NOMBRE_ARCHIVO_UNICO}\n"
+        "    - nombre: clientes.csv\n"
         "      columnas:\n"
-        "        - nombre: test_id\n"
+        "        - nombre: cliente_id\n"
         "          tipo: integer\n"
         "          nulable: false\n"
         "          llave: true\n"
-        "        - nombre: test_id\n"
+        "    - nombre: ventas.csv\n"
+        "      columnas:\n"
+        "        - nombre: venta_id\n"
+        "          tipo: integer\n"
+        "          nulable: false\n"
+        "          llave: true\n"
+        "        - nombre: venta_id\n"
         "          tipo: string\n"
         "          nulable: true\n"
         "          llave: false\n"
@@ -1211,8 +1296,10 @@ def test_load_contract_duplicados_exactos(
     with pytest.raises(ContractSchemaError) as exc_info:
         load_contract(path)
 
-    mensaje = str(exc_info.value)
-    assert "test_id" in mensaje
+    mensaje_esperado = (
+        "archivo[1] 'ventas.csv': nombre de columna duplicado: 'venta_id'"
+    )
+    assert str(exc_info.value) == mensaje_esperado
 
 
 @pytest.mark.parametrize(
@@ -1380,6 +1467,11 @@ def test_load_contract_parse_error_mensaje_accionable(
     El fixture se escribe deliberadamente con un `filename` sin la
     extensión ".yaml" (`contrato_roto.txt`) para que la palabra "yaml" no
     pueda colarse por accidente desde la ruta del archivo.
+
+    Endurecimiento (Caso 19, M-12): el mensaje debe **anteponer** el prefijo
+    literal `el archivo YAML del contrato es sintácticamente inválido` antes
+    del detalle crudo de PyYAML (no se fija el detalle completo porque varía
+    entre versiones de PyYAML, pero el prefijo accionable sí es exacto).
     """
     texto = (
         "contract_data:\n"
@@ -1396,7 +1488,17 @@ def test_load_contract_parse_error_mensaje_accionable(
     with pytest.raises(ContractParseError) as exc_info:
         load_contract(path)
 
-    mensaje = str(exc_info.value).lower()
+    mensaje_original = str(exc_info.value)
+    prefijo_esperado = (
+        "el archivo YAML del contrato es sintácticamente inválido: "
+    )
+    assert mensaje_original.startswith(prefijo_esperado), (
+        f"el mensaje de ContractParseError debe anteponer el prefijo "
+        f"literal M-12 {prefijo_esperado!r}; mensaje actual: "
+        f"{mensaje_original!r}"
+    )
+
+    mensaje = mensaje_original.lower()
     assert "yaml" in mensaje, (
         f"el mensaje de ContractParseError debe mencionar 'YAML' de forma "
         f"accionable; mensaje actual: {mensaje!r}"

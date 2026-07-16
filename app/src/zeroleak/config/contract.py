@@ -5,7 +5,7 @@ contrato (única ruta que abre; frontera D-21), lo parsea con `yaml.safe_load`
 y valida su esquema con Pydantic, devolviendo un `Contract` tipado en memoria.
 
 Nota (paso 10, GREEN, TSK-09/TSK-13/TSK-15/TSK-17/TSK-19/TSK-20/TSK-21/TSK-22/
-TSK-23/TSK-25/TSK-27/TSK-29/TSK-30/TSK-31/TSK-33/TSK-34): esta versión cubre
+TSK-23/TSK-25/TSK-27/TSK-29/TSK-30/TSK-31/TSK-33/TSK-34/TSK-35/TSK-36): esta versión cubre
 el camino feliz (CA-01 a CA-03:
 count, orden, fidelidad de campos y los 6 tipos del enum), la traducción de
 esquema para campo requerido faltante (CA-04/CA-05, fail-fast,
@@ -39,7 +39,13 @@ rama `missing` de nivel columna con `loc == ("archivos", i, "columnas", j,
 campo)`), que localiza el archivo con el mismo `_localizador_archivo`
 usado por las ramas de nivel archivo y le antepone `columna de índice {j}`,
 de modo que el nombre del archivo aparece en el mensaje aunque Pydantic no
-lo reporte en su propio `loc`.
+lo reporte en su propio `loc`, y para `tipo` fuera del enum cerrado dentro
+de una columna concreta de un archivo concreto (CA-16, M-10 exacto, rama
+`enum` de nivel columna con `loc == ("archivos", i, "columnas", j, "tipo")`),
+que reutiliza el mismo `_localizador_archivo` y antepone `columna de índice
+{j}` antes del valor inválido recibido y el mensaje nativo de Pydantic (que
+ya enumera los 6 tipos permitidos), mismo patrón que la rama `missing` de
+nivel columna del párrafo anterior.
 Queda pendiente el fail-fast ante violaciones múltiples de distinta
 naturaleza y las caracterizaciones aún no escritas de la frontera de
 lectura, la invocación directa sin CLI y los fixtures sintéticos sin PII.
@@ -303,6 +309,13 @@ def _mensaje_esquema(exc: ValidationError, archivos_crudos: list) -> str:
       `tipo`, `nulable`, `llave`) ausente en la columna `j` del archivo `i`;
       se localiza con `_localizador_archivo(i, archivos_crudos)` y se agrega
       `columna de índice {j}` antes de nombrar el campo faltante.
+    - `enum` de nivel columna (`loc == ("archivos", i, "columnas", j,
+      "tipo")`): CA-16, M-10. `tipo` fuera del enum cerrado en la columna `j`
+      del archivo `i`; mismo patrón de localización que la rama `missing` de
+      nivel columna de arriba (`_localizador_archivo(i, archivos_crudos)` +
+      `columna de índice {j}`), agregando el valor inválido recibido
+      (`primer_error["input"]`) y el mensaje nativo de Pydantic (que ya
+      enumera los 6 valores permitidos).
     - fallback genérico: cualquier otro `type` de error de Pydantic no
       cubierto arriba todavía.
     """
