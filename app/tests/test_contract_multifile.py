@@ -1712,3 +1712,89 @@ def test_load_contract_fixtures_sinteticos_sin_pii(
                 f"el nombre de columna {nombre!r} parece un correo real, no "
                 f"un identificador de columna ficticio"
             )
+
+
+def test_load_contract_fail_fast_cardinalidad_agnostico_al_orden(
+    write_contract_yaml: Callable[..., Path],
+    ventas_columnas: list[dict],
+) -> None:
+    """Caso 20 (TSK-40, CA-21): YAML que viola **dos** reglas a la vez --
+    dos archivos `ventas.csv` (nombre duplicado, M-05) **y** un `tipo`
+    inválido (`numero_magico`) en una columna del **segundo** `ventas.csv`
+    (M-10) -- produce **exactamente una** `ContractSchemaError` con **un
+    solo** mensaje, sin lista agregada de errores de Pydantic (fail-fast,
+    D-23c).
+
+    **Agnóstico al orden (D-26b, gate paso 7 aprobado)**: la spec relajó
+    deliberadamente este CA para no acoplar el test al orden interno de
+    ejecución de los `field_validator` de Pydantic (los de lista corren
+    DESPUÉS de los de ítem, D-25 hallazgo 4). Este test **no fija** cuál de
+    los dos mensajes gana: acepta **M-05 o M-10** como igualmente
+    conformes. Lo que sí verifica es la propiedad de fail-fast en sí misma:
+    cardinalidad (una sola excepción) y ausencia de agregación (el mensaje
+    no es una concatenación/lista de varios errores -- no contiene ambos
+    fragmentos M-05 y M-10 a la vez, ni el patrón de PyDantic de "N
+    validation errors for").
+
+    El segundo `ventas.csv` reutiliza `ventas_columnas` (TSK-02) con la
+    columna de índice 1 (`cliente_id`) mudada a `tipo: numero_magico`, para
+    que el M-10 esperado (si gana) sea `archivo[1] 'ventas.csv', columna de
+    índice 1, campo 'tipo': valor 'numero_magico' inválido (...)` --
+    coherente con el estilo ya congelado en los Casos 16/17. Reutiliza
+    `write_contract_yaml` (TSK-01) vía `archivos=`; sin fixtures nuevos en
+    disco (C-01).
+
+    Candidato a **caracterización** (marcado `(car?)` en el plan, L-13/L-14):
+    el fail-fast ya vigente en `_mensaje_esquema` (que toma `exc.errors()[0]`,
+    heredado de `config_contract`, D-23c) ya limita a un solo mensaje por
+    diseño, sin necesitar código nuevo. Si `pytest` confirma verde
+    inmediato, la honestidad de este test se verifica por inyección/
+    reversión temporal (L-10): se inyecta un defecto en `_mensaje_esquema`
+    (`app/src/zeroleak/config/contract.py`) que agregue **todos** los
+    mensajes de `exc.errors()` en vez de solo el primero, se confirma que
+    el test pasa a FAILED, y se revierte de inmediato dejando `contract.py`
+    sin diff nuevo.
+    """
+    ventas_defectuoso = [
+        dict(ventas_columnas[0]),
+        {**ventas_columnas[1], "tipo": "numero_magico"},
+        dict(ventas_columnas[2]),
+        dict(ventas_columnas[3]),
+    ]
+    archivos = [
+        {"nombre": "ventas.csv", "columnas": ventas_columnas},
+        {"nombre": "ventas.csv", "columnas": ventas_defectuoso},
+    ]
+    path = write_contract_yaml(archivos=archivos)
+
+    with pytest.raises(ContractSchemaError) as exc_info:
+        load_contract(path)
+
+    mensaje = str(exc_info.value)
+
+    mensaje_m05 = "nombre de archivo duplicado: 'ventas.csv'"
+    mensaje_m10 = (
+        "archivo[1] 'ventas.csv', columna de índice 1, campo 'tipo': valor "
+        "'numero_magico' inválido (Input should be 'string', 'integer', "
+        "'float', 'date', 'datetime' or 'boolean')"
+    )
+
+    assert mensaje in (mensaje_m05, mensaje_m10), (
+        f"el único mensaje debe ser exactamente M-05 o exactamente M-10 "
+        f"(agnóstico al orden, D-26b), nunca otra cosa; mensaje observado: "
+        f"{mensaje!r}"
+    )
+
+    # Ausencia de agregación: cardinalidad de un solo error, no una lista.
+    assert "\n" not in mensaje, (
+        f"el mensaje no debe contener múltiples líneas (indicio de lista "
+        f"agregada de errores de Pydantic); mensaje observado: {mensaje!r}"
+    )
+    assert not ("validation error" in mensaje.lower()), (
+        f"el mensaje no debe exponer el resumen agregado nativo de Pydantic "
+        f"('N validation errors for ...'); mensaje observado: {mensaje!r}"
+    )
+    assert not (mensaje_m05 in mensaje and mensaje_m10 in mensaje), (
+        f"el mensaje no debe concatenar M-05 y M-10 a la vez (eso sería "
+        f"agregación, no fail-fast); mensaje observado: {mensaje!r}"
+    )
