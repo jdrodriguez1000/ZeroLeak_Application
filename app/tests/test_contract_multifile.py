@@ -1710,6 +1710,19 @@ _NOMBRES_COLUMNA_SINTETICOS_PERMITIDOS = {
     "precio",
 }
 
+# Nombres de archivo ficticios acordados para el vocabulario multi-archivo de
+# esta feature (TSK-02: `clientes_columnas`/`ventas_columnas`/
+# `catalogo_columnas` y las variantes `archivos_*` de conftest.py). Lista
+# blanca auditable: si un fixture futuro nombra un archivo fuera de este set
+# (p. ej. un nombre de cliente real o una ruta con apariencia de dataset de
+# producción), este test lo detecta como regresión de C-01.
+_NOMBRES_ARCHIVO_SINTETICOS_PERMITIDOS = {
+    "clientes.csv",
+    "ventas.csv",
+    "catalogo.csv",
+    _NOMBRE_ARCHIVO_UNICO,
+}
+
 # Patrón de la ruta "prohibida" de C-01: cualquier segmento `clients/<algo>/data/`
 # (o su variante con separador `\`), que es exactamente lo que `.gitignore`
 # aísla como Bóveda de datos reales por tenant (Medallion, decisions.md D-09/D-11).
@@ -1720,16 +1733,34 @@ def test_load_contract_fixtures_sinteticos_sin_pii(
     write_contract_yaml: Callable[..., Path],
     contrato_valido_columnas: list[dict],
     contrato_seis_tipos_columnas: list[dict],
+    clientes_columnas: list[dict],
+    ventas_columnas: list[dict],
+    catalogo_columnas: list[dict],
+    archivos_dos_archivos: list[dict],
+    archivos_tres_archivos: list[dict],
     tmp_path: Path,
 ) -> None:
-    """Destino final: Caso 26 (CA-26): auditoría de cumplimiento C-01 -- todos
+    """Caso 26 (TSK-47, CA-26): auditoría de cumplimiento C-01 -- todos
     los fixtures usados en los tests de `contract_multifile` (contratos
     válidos e inválidos, de uno y de varios archivos) son YAMLs sintéticos,
-    sin PII, y ninguno reside bajo `clients/*/data/` (TSK-03: forma migrada).
+    sin PII, y ninguno reside bajo `clients/*/data/`.
 
-    Dos partes: (a) rutas materializadas siempre bajo `tmp_path`, nunca bajo
-    `clients/<tenant>/data/`; (b) nombres de columna dentro de la lista
-    blanca sintética acordada, sin PII.
+    Ampliado (TSK-47) respecto de la migración de forma del Caso 1 (TSK-03):
+    aquella versión solo auditaba las columnas "genéricas" heredadas
+    (`contrato_valido_columnas`/`contrato_seis_tipos_columnas`, vocabulario
+    de `config_contract`) y dos rutas de fixture de un solo archivo. Esta
+    versión añade el vocabulario **nuevo** propio de `contract_multifile`
+    (`clientes.csv`/`ventas.csv`/`catalogo.csv`, `cliente_id`/`venta_id`/
+    `vendida_en`/`sku`/`precio`, TSK-02) a la auditoría: tres partes.
+
+    (a) rutas materializadas siempre bajo `tmp_path`, nunca bajo
+    `clients/<tenant>/data/` -- incluyendo ahora un fixture multi-archivo
+    real (`archivos_tres_archivos`), no solo variantes de un archivo;
+    (b) nombres de columna de TODAS las listas de columnas ficticias
+    (heredadas y nuevas) dentro de la lista blanca sintética acordada;
+    (c) nombres de archivo (`ArchivoContrato.nombre` declarado en el YAML)
+    dentro de su propia lista blanca sintética -- auditoría que no existía
+    antes de TSK-47.
     """
     # (a) Ruta del fixture generado desde archivos (camino feliz reutilizado).
     path_desde_archivos = write_contract_yaml(
@@ -1746,8 +1777,10 @@ def test_load_contract_fixtures_sinteticos_sin_pii(
         ),
         filename="contrato_auditoria_texto_crudo.yaml",
     )
+    # Ruta del fixture multi-archivo (vocabulario nuevo: clientes/ventas/catalogo).
+    path_desde_tres_archivos = write_contract_yaml(archivos=archivos_tres_archivos)
 
-    for path in (path_desde_archivos, path_desde_texto):
+    for path in (path_desde_archivos, path_desde_texto, path_desde_tres_archivos):
         assert path.is_relative_to(tmp_path), (
             f"el fixture de contract_data.yaml debe materializarse bajo "
             f"tmp_path (área temporal sintética de pytest); ruta observada: "
@@ -1760,8 +1793,15 @@ def test_load_contract_fixtures_sinteticos_sin_pii(
             f"observada: {path}"
         )
 
-    # (b) Nombres de columna dentro de la lista blanca sintética, sin PII.
-    for columnas in (contrato_valido_columnas, contrato_seis_tipos_columnas):
+    # (b) Nombres de columna dentro de la lista blanca sintética, sin PII
+    # -- incluye las columnas heredadas y las del vocabulario nuevo (TSK-02).
+    for columnas in (
+        contrato_valido_columnas,
+        contrato_seis_tipos_columnas,
+        clientes_columnas,
+        ventas_columnas,
+        catalogo_columnas,
+    ):
         for col in columnas:
             nombre = col["nombre"]
             assert nombre in _NOMBRES_COLUMNA_SINTETICOS_PERMITIDOS, (
@@ -1771,6 +1811,17 @@ def test_load_contract_fixtures_sinteticos_sin_pii(
             assert "@" not in nombre, (
                 f"el nombre de columna {nombre!r} parece un correo real, no "
                 f"un identificador de columna ficticio"
+            )
+
+    # (c) Nombres de archivo dentro de su propia lista blanca sintética
+    # (auditoría nueva de TSK-47, antes solo se auditaban columnas y rutas).
+    for archivos in (archivos_dos_archivos, archivos_tres_archivos):
+        for archivo in archivos:
+            nombre_archivo = archivo["nombre"]
+            assert nombre_archivo in _NOMBRES_ARCHIVO_SINTETICOS_PERMITIDOS, (
+                f"nombre de archivo fuera de la lista blanca sintética "
+                f"acordada (posible nombre de cliente/dataset real sin "
+                f"auditar): {nombre_archivo!r}"
             )
 
 
