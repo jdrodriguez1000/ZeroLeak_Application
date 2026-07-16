@@ -14,12 +14,13 @@ esquema para campo requerido faltante (CA-04/CA-05, fail-fast,
 M-07 exacto localizando el archivo por índice + nombre con
 `_localizador_archivo`), para `archivos: []`/ausente/nula (CA-06/CA-07, M-04
 exacto, `_archivos_no_vacia`), para `archivos` presente pero no-lista
-(CA-09, M-03 exacto, guarda de tipo en `load_contract` antes de Pydantic),
-para el esquema viejo de un solo archivo (`columnas` residual en la raíz de
-`contract_data` sin `archivos` utilizable, CA-08, M-02 exacto), para el
-esquema híbrido (`columnas` residual en la raíz Y `archivos` utilizable a
-la vez, CA-28, M-13 exacto, `_MENSAJE_HIBRIDO`, rama complementaria y
-disjunta de M-02 dentro del mismo bloque `if "columnas" in cuerpo:`), para
+(CA-09, M-03 exacto, guarda de tipo en `_normalizar_y_validar_lista_archivos`
+antes de Pydantic), para el esquema viejo de un solo archivo (`columnas`
+residual en la raíz de `contract_data` sin `archivos` utilizable, CA-08,
+M-02 exacto), para el esquema híbrido (`columnas` residual en la raíz Y
+`archivos` utilizable a la vez, CA-28, M-13 exacto, `_MENSAJE_HIBRIDO`, rama
+complementaria y disjunta de M-02 dentro de
+`_rechazar_esquema_viejo_o_hibrido`), para
 `nombre` de columna duplicado por cadena exacta (`_columnas_sin_duplicados`:
 la comparación ya es exacta, sin normalizar mayúsculas ni espacios), para
 YAML sintácticamente inválido, que se distingue como `ContractParseError`
@@ -54,11 +55,62 @@ ya es invocable directo, sin fachada CLI (CA-27): su firma expone
 (módulo sin `from __future__ import annotations`, para que la anotación
 cruda de `inspect.signature` no quede diferida como cadena).
 """
+from collections.abc import Iterable
 from enum import Enum
 from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, ValidationError, field_validator
+
+# Catálogo de mensajes congelados M-01..M-13 (spec.md §"Mensajes y textos
+# congelados"). Cada texto vive en UN ÚNICO sitio nombrado aquí; el resto del
+# módulo solo lo referencia (por `.format(...)` cuando lleva placeholders).
+# Los tests fijan estos textos por igualdad EXACTA: no se cambia ni un
+# carácter de ninguno al refactorizar, solo su ubicación (TSK-48).
+_MENSAJE_YAML_INVALIDO = "el archivo YAML del contrato es sintácticamente inválido"  # M-12
+_MENSAJE_RAIZ_INVALIDA = (  # M-01
+    "la clave raíz 'contract_data' debe contener un mapa con la lista "
+    "'archivos' (se encontró: {cuerpo!r})"
+)
+_MENSAJE_ESQUEMA_VIEJO = (  # M-02
+    "el contrato usa el esquema anterior de un solo archivo: se "
+    "encontró 'columnas' en la raíz de 'contract_data'; ahora las "
+    "columnas van dentro de 'archivos[]' "
+    "(contract_data.archivos[].columnas)"
+)
+_MENSAJE_ARCHIVOS_NO_LISTA = "'archivos' debe ser una lista (se encontró: {valor!r})"  # M-03
+_MENSAJE_ARCHIVOS_VACIA = "la lista de archivos no puede estar vacía"  # M-04
+_MENSAJE_ARCHIVO_DUPLICADO = "nombre de archivo duplicado: {nombres}"  # M-05
+_MENSAJE_COLUMNAS_VACIA = "la lista de columnas no puede estar vacía"  # M-07
+_MENSAJE_COLUMNA_DUPLICADA = "nombre de columna duplicado: {nombres}"  # M-11
+_MENSAJE_HIBRIDO = (  # M-13
+    "el contrato declara 'archivos[]' y además un 'columnas' "
+    "residual en la raíz de 'contract_data': ese bloque no se valida "
+    "ni se audita; elimínelo y deje cada columna dentro del archivo "
+    "al que pertenece (contract_data.archivos[].columnas)"
+)
+# M-06, M-08, M-09 y M-10 no son texto fijo: son plantillas que combinan el
+# localizador `archivo[i] 'nombre'` (D-25a) con el mensaje nativo de Pydantic
+# (`missing`/`enum`), y viven junto a `_mensaje_esquema`, su único sitio de uso.
+
+
+def _nombres_duplicados(nombres: Iterable[str]) -> str:
+    """Comprime un iterable de `nombre` en 'a', 'b' con los REPETIDOS (M-05/M-11).
+
+    Auxiliar cohesivo compartido por `_archivos_sin_duplicados` (nivel
+    archivo) y `_columnas_sin_duplicados` (nivel columna, dentro de un mismo
+    archivo): ambos comparan por cadena exacta, sin normalizar mayúsculas ni
+    espacios (D-25b/D-23e), y solo difieren en qué lista recorren. Devuelve
+    ya formateado el fragmento `'x', 'y'` a insertar en M-05/M-11 (cadena
+    vacía si no hay duplicados).
+    """
+    vistos: set[str] = set()
+    duplicados: list[str] = []
+    for nombre in nombres:
+        if nombre in vistos and nombre not in duplicados:
+            duplicados.append(nombre)
+        vistos.add(nombre)
+    return ", ".join(f"'{n}'" for n in duplicados)
 
 
 class TipoDato(str, Enum):
@@ -97,27 +149,21 @@ class ArchivoContrato(BaseModel):
     @field_validator("columnas")
     @classmethod
     def _columnas_no_vacias(cls, valor: list[Columna]) -> list[Columna]:
-        """Rechaza `columnas: []` (CA-11); mensaje estable (D-23e)."""
+        """Rechaza `columnas: []` (CA-11, M-07); mensaje estable (D-23e)."""
         if not valor:
-            raise ValueError("la lista de columnas no puede estar vacía")
+            raise ValueError(_MENSAJE_COLUMNAS_VACIA)
         return valor
 
     @field_validator("columnas")
     @classmethod
     def _columnas_sin_duplicados(cls, valor: list[Columna]) -> list[Columna]:
-        """Rechaza `nombre` duplicado por cadena exacta (CA-09, D-23e).
+        """Rechaza `nombre` duplicado por cadena exacta (CA-17, M-11).
 
         Compara los `nombre` tal cual, sin normalizar mayúsculas ni espacios.
         """
-        vistos: set[str] = set()
-        duplicados: list[str] = []
-        for columna in valor:
-            if columna.nombre in vistos and columna.nombre not in duplicados:
-                duplicados.append(columna.nombre)
-            vistos.add(columna.nombre)
+        duplicados = _nombres_duplicados(columna.nombre for columna in valor)
         if duplicados:
-            nombres = ", ".join(f"'{n}'" for n in duplicados)
-            raise ValueError(f"nombre de columna duplicado: {nombres}")
+            raise ValueError(_MENSAJE_COLUMNA_DUPLICADA.format(nombres=duplicados))
         return valor
 
 
@@ -131,7 +177,7 @@ class Contract(BaseModel):
     def _archivos_no_vacia(cls, valor: list[ArchivoContrato]) -> list[ArchivoContrato]:
         """Rechaza `archivos: []` (CA-06/CA-07); mensaje estable M-04."""
         if not valor:
-            raise ValueError("la lista de archivos no puede estar vacía")
+            raise ValueError(_MENSAJE_ARCHIVOS_VACIA)
         return valor
 
     @field_validator("archivos")
@@ -143,38 +189,10 @@ class Contract(BaseModel):
         vistos (no compara solo pares adyacentes, Riesgo Técnico 7), por
         cadena exacta, sin normalizar (D-25b/D-23e).
         """
-        vistos: set[str] = set()
-        duplicados: list[str] = []
-        for archivo in valor:
-            if archivo.nombre in vistos and archivo.nombre not in duplicados:
-                duplicados.append(archivo.nombre)
-            vistos.add(archivo.nombre)
+        duplicados = _nombres_duplicados(archivo.nombre for archivo in valor)
         if duplicados:
-            nombres = ", ".join(f"'{n}'" for n in duplicados)
-            raise ValueError(f"nombre de archivo duplicado: {nombres}")
+            raise ValueError(_MENSAJE_ARCHIVO_DUPLICADO.format(nombres=duplicados))
         return valor
-
-
-_MENSAJE_YAML_INVALIDO = "el archivo YAML del contrato es sintácticamente inválido"
-_MENSAJE_RAIZ_INVALIDA = (
-    "la clave raíz 'contract_data' debe contener un mapa con la lista "
-    "'archivos' (se encontró: {cuerpo!r})"
-)
-_MENSAJE_ARCHIVOS_NO_LISTA = (
-    "'archivos' debe ser una lista (se encontró: {valor!r})"
-)
-_MENSAJE_ESQUEMA_VIEJO = (
-    "el contrato usa el esquema anterior de un solo archivo: se "
-    "encontró 'columnas' en la raíz de 'contract_data'; ahora las "
-    "columnas van dentro de 'archivos[]' "
-    "(contract_data.archivos[].columnas)"
-)
-_MENSAJE_HIBRIDO = (
-    "el contrato declara 'archivos[]' y además un 'columnas' "
-    "residual en la raíz de 'contract_data': ese bloque no se valida "
-    "ni se audita; elimínelo y deje cada columna dentro del archivo "
-    "al que pertenece (contract_data.archivos[].columnas)"
-)
 
 
 class ContractParseError(Exception):
@@ -200,52 +218,73 @@ def load_contract(path: str | Path) -> Contract:
                 f"{_MENSAJE_YAML_INVALIDO}: {exc}"
             ) from exc
 
-    # Extracción defensiva por tipo de la raíz (T-56, ampliado por D-25): se
-    # comprueba con `isinstance` que `contract_data` sea un mapa antes de
-    # tocarlo, para nunca encadenar `.get(...).get(...)` sobre un valor nulo
-    # o no-mapa y así jamás propagar un `AttributeError` (CA-19, CA-20).
-    raiz = crudo if isinstance(crudo, dict) else {}
-    cuerpo = raiz.get("contract_data")
-    if not isinstance(cuerpo, dict):
-        raise ContractSchemaError(_MENSAJE_RAIZ_INVALIDA.format(cuerpo=cuerpo))
-    # Residual del esquema viejo (TSK-21, Caso 9, D-25c): si `contract_data`
-    # todavía declara `columnas` en su raíz, se bifurca por la utilizabilidad
-    # de `archivos` ANTES de la normalización/guarda de abajo, para no dejar
-    # caer el flujo en silencio hacia M-04 (lista vacía). Rama 'archivos' NO
-    # utilizable (ausente, nula o lista vacía) -> M-02 aquí mismo. Rama
-    # 'archivos' SÍ utilizable (lista no vacía) es el híbrido M-13 (Caso 10,
-    # TSK-23, D-26): el residual `columnas` nunca se ignora en silencio, se
-    # rechaza aquí mismo, contigua y disjunta de la rama M-02 de arriba.
-    if "columnas" in cuerpo:
-        archivos_residual = cuerpo.get("archivos")
-        archivos_utilizable = (
-            isinstance(archivos_residual, list) and len(archivos_residual) > 0
-        )
-        if not archivos_utilizable:
-            raise ContractSchemaError(_MENSAJE_ESQUEMA_VIEJO)
-        raise ContractSchemaError(_MENSAJE_HIBRIDO)
-    # Ausente o nula (None) se normaliza a `[]` (TSK-17, Caso 7): así ambas
-    # caen en el mismo camino que la lista explícitamente vacía y producen el
-    # mensaje de negocio M-04, en vez de un error de tipo genérico de
-    # Pydantic para el caso nulo. No confundir con un valor no-lista (p. ej.
-    # una cadena), que es el Caso 8 (M-03), fuera de alcance aquí.
-    archivos = cuerpo.get("archivos", [])
-    if archivos is None:
-        archivos = []
-    # Guarda de tipo (TSK-19, Caso 8): si tras la normalización anterior
-    # `archivos` sigue presente pero no es una lista (p. ej. una cadena),
-    # se rechaza aquí con el mensaje de negocio M-03 antes de llegar a
-    # Pydantic, que solo reportaría un error de tipo genérico (`list_type`)
-    # no traducido por `_mensaje_esquema`. Una lista vacía `[]` no es
-    # no-lista y sigue su camino normal hacia M-04.
-    if not isinstance(archivos, list):
-        raise ContractSchemaError(
-            _MENSAJE_ARCHIVOS_NO_LISTA.format(valor=archivos)
-        )
+    cuerpo = _extraer_cuerpo_contract_data(crudo)
+    _rechazar_esquema_viejo_o_hibrido(cuerpo)
+    archivos = _normalizar_y_validar_lista_archivos(cuerpo)
     try:
         return Contract.model_validate({"archivos": archivos})
     except ValidationError as exc:
         raise ContractSchemaError(_mensaje_esquema(exc, archivos)) from exc
+
+
+def _extraer_cuerpo_contract_data(crudo: object) -> dict:
+    """Extracción defensiva por tipo de `contract_data` (T-56, D-25, M-01).
+
+    Comprueba con `isinstance` que la raíz del YAML y luego `contract_data`
+    sean un mapa antes de tocarlos, para nunca encadenar `.get(...).get(...)`
+    sobre un valor nulo o no-mapa y así jamás propagar un `AttributeError`
+    (CA-19, CA-20).
+    """
+    raiz = crudo if isinstance(crudo, dict) else {}
+    cuerpo = raiz.get("contract_data")
+    if not isinstance(cuerpo, dict):
+        raise ContractSchemaError(_MENSAJE_RAIZ_INVALIDA.format(cuerpo=cuerpo))
+    return cuerpo
+
+
+def _rechazar_esquema_viejo_o_hibrido(cuerpo: dict) -> None:
+    """Rechaza el esquema anterior (M-02) y el híbrido (M-13, D-26).
+
+    Si `contract_data` todavía declara `columnas` en su raíz, se bifurca por
+    la utilizabilidad de `archivos` ANTES de la normalización/guarda de
+    `_normalizar_y_validar_lista_archivos`, para no dejar caer el flujo en
+    silencio hacia M-04 (lista vacía). Rama 'archivos' NO utilizable
+    (ausente, nula o lista vacía) -> M-02 (Caso 9, TSK-21, D-25c). Rama
+    'archivos' SÍ utilizable (lista no vacía) es el híbrido M-13 (Caso 10,
+    TSK-23, D-26): el residual `columnas` nunca se ignora en silencio, se
+    rechaza aquí mismo, contigua y disjunta de la rama M-02. No hace nada
+    (sigue el flujo normal) si `columnas` no está en la raíz.
+    """
+    if "columnas" not in cuerpo:
+        return
+    archivos_residual = cuerpo.get("archivos")
+    archivos_utilizable = (
+        isinstance(archivos_residual, list) and len(archivos_residual) > 0
+    )
+    if not archivos_utilizable:
+        raise ContractSchemaError(_MENSAJE_ESQUEMA_VIEJO)
+    raise ContractSchemaError(_MENSAJE_HIBRIDO)
+
+
+def _normalizar_y_validar_lista_archivos(cuerpo: dict) -> list:
+    """Normaliza `archivos` nulo a `[]` (M-04) y rechaza no-lista (M-03).
+
+    Ausente o nula (`None`) se normaliza a `[]` (TSK-17, Caso 7): así ambas
+    caen en el mismo camino que la lista explícitamente vacía y producen el
+    mensaje de negocio M-04, en vez de un error de tipo genérico de Pydantic
+    para el caso nulo. Tras la normalización, si `archivos` sigue presente
+    pero no es una lista (p. ej. una cadena), se rechaza aquí con el mensaje
+    de negocio M-03 (TSK-19, Caso 8) antes de llegar a Pydantic, que solo
+    reportaría un error de tipo genérico (`list_type`) no traducido por
+    `_mensaje_esquema`. Una lista vacía `[]` no es no-lista y sigue su
+    camino normal hacia M-04 (dentro de Pydantic, `_archivos_no_vacia`).
+    """
+    archivos = cuerpo.get("archivos", [])
+    if archivos is None:
+        archivos = []
+    if not isinstance(archivos, list):
+        raise ContractSchemaError(_MENSAJE_ARCHIVOS_NO_LISTA.format(valor=archivos))
+    return archivos
 
 
 def _localizador_archivo(indice: object, archivos_crudos: list) -> str:
@@ -267,6 +306,37 @@ def _localizador_archivo(indice: object, archivos_crudos: list) -> str:
     if nombre is not None:
         return f"archivo[{indice}] '{nombre}'"
     return f"archivo[{indice}]"
+
+
+# Plantillas de M-06/M-08 (missing nivel archivo), M-09 (missing nivel
+# columna) y M-10 (enum nivel columna): a diferencia de M-01..M-05/M-07/M-11
+# (arriba), estas no son texto fijo -- combinan el localizador
+# `archivo[i] 'nombre'` (D-25a) con el `msg`/`input` nativo de Pydantic -- por
+# lo que viven junto a `_mensaje_esquema`, su único sitio de uso.
+_PLANTILLA_MISSING_NIVEL_ARCHIVO = "{localizador}: falta el campo requerido '{campo}' ({msg})"
+_PLANTILLA_MISSING_NIVEL_COLUMNA = (
+    "{localizador}, columna de índice {indice_columna}: falta el campo "
+    "requerido '{campo}' ({msg})"
+)
+_PLANTILLA_ENUM_NIVEL_COLUMNA = (
+    "{localizador}, columna de índice {indice_columna}, campo '{campo}': "
+    "valor '{valor_invalido}' inválido ({msg})"
+)
+
+
+def _loc_nivel_raiz_lista(loc: tuple) -> bool:
+    """`loc` de un `value_error` sobre `columnas` o `archivos` completos (M-04/M-07 sin archivo)."""
+    return loc in (("columnas",), ("archivos",))
+
+
+def _loc_nivel_archivo(loc: tuple, campos: tuple[str, ...]) -> bool:
+    """`loc` de nivel archivo: `('archivos', i, campo)` con `campo` en `campos`."""
+    return len(loc) == 3 and loc[0] == "archivos" and loc[2] in campos
+
+
+def _loc_nivel_columna(loc: tuple) -> bool:
+    """`loc` de nivel columna: `('archivos', i, 'columnas', j, campo)` (M-09/M-10)."""
+    return len(loc) == 5 and loc[0] == "archivos" and loc[2] == "columnas"
 
 
 def _mensaje_esquema(exc: ValidationError, archivos_crudos: list) -> str:
@@ -327,49 +397,36 @@ def _mensaje_esquema(exc: ValidationError, archivos_crudos: list) -> str:
     indice = loc[1] if len(loc) > 1 else "?"
     tipo_error = primer_error.get("type", "")
     msg = primer_error.get("msg", "")
+    msg_sin_prefijo = msg.removeprefix("Value error, ")
 
-    if tipo_error == "value_error" and loc in (("columnas",), ("archivos",)):
-        return msg.removeprefix("Value error, ")
-    if tipo_error == "value_error" and len(loc) == 3 and loc[0] == "archivos" and loc[2] == "columnas":
+    if tipo_error == "value_error" and _loc_nivel_raiz_lista(loc):
+        return msg_sin_prefijo
+    if tipo_error == "value_error" and _loc_nivel_archivo(loc, ("columnas",)):
         localizador = _localizador_archivo(indice, archivos_crudos)
-        return f"{localizador}: {msg.removeprefix('Value error, ')}"
-    if (
-        tipo_error == "missing"
-        and len(loc) == 3
-        and loc[0] == "archivos"
-        and loc[2] in ("nombre", "columnas")
-    ):
+        return f"{localizador}: {msg_sin_prefijo}"
+    if tipo_error == "missing" and _loc_nivel_archivo(loc, ("nombre", "columnas")):
         localizador = _localizador_archivo(indice, archivos_crudos)
-        return f"{localizador}: falta el campo requerido '{campo}' ({msg})"
-    if (
-        tipo_error == "missing"
-        and len(loc) == 5
-        and loc[0] == "archivos"
-        and loc[2] == "columnas"
-    ):
+        return _PLANTILLA_MISSING_NIVEL_ARCHIVO.format(
+            localizador=localizador, campo=campo, msg=msg
+        )
+    if tipo_error == "missing" and _loc_nivel_columna(loc):
         localizador = _localizador_archivo(indice, archivos_crudos)
-        indice_columna = loc[3]
-        return (
-            f"{localizador}, columna de índice {indice_columna}: falta el "
-            f"campo requerido '{campo}' ({msg})"
+        return _PLANTILLA_MISSING_NIVEL_COLUMNA.format(
+            localizador=localizador, indice_columna=loc[3], campo=campo, msg=msg
         )
     if tipo_error == "missing":
         return (
             f"falta el campo requerido '{campo}' en la columna de índice {indice} "
             f"({msg})"
         )
-    if (
-        tipo_error == "enum"
-        and len(loc) == 5
-        and loc[0] == "archivos"
-        and loc[2] == "columnas"
-    ):
+    if tipo_error == "enum" and _loc_nivel_columna(loc):
         localizador = _localizador_archivo(indice, archivos_crudos)
-        indice_columna = loc[3]
-        valor_invalido = primer_error.get("input", "?")
-        return (
-            f"{localizador}, columna de índice {indice_columna}, campo "
-            f"'{campo}': valor '{valor_invalido}' inválido ({msg})"
+        return _PLANTILLA_ENUM_NIVEL_COLUMNA.format(
+            localizador=localizador,
+            indice_columna=loc[3],
+            campo=campo,
+            valor_invalido=primer_error.get("input", "?"),
+            msg=msg,
         )
     if tipo_error == "enum":
         valor_invalido = primer_error.get("input", "?")
