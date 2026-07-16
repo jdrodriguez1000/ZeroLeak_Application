@@ -4,21 +4,26 @@
 contrato (única ruta que abre; frontera D-21), lo parsea con `yaml.safe_load`
 y valida su esquema con Pydantic, devolviendo un `Contract` tipado en memoria.
 
-Nota (paso 10, GREEN, TSK-09/TSK-13/TSK-15/TSK-17/TSK-20/TSK-22): esta
-versión cubre el camino feliz (CA-01 a CA-03: count, orden, fidelidad de
+Nota (paso 10, GREEN, TSK-09/TSK-13/TSK-15/TSK-17/TSK-19/TSK-20/TSK-21/TSK-22):
+esta versión cubre el camino feliz (CA-01 a CA-03: count, orden, fidelidad de
 campos y los 6 tipos del enum), la traducción de esquema para campo
 requerido faltante (CA-04/CA-05, fail-fast, `_mensaje_esquema`), para `tipo`
 fuera del enum cerrado (CA-06), para `columnas: []`/ausente (CA-11,
-`_columnas_no_vacias`), para `nombre` de columna duplicado por cadena exacta
-(CA-09, `_columnas_sin_duplicados`, con CA-10 caracterizado sobre el mismo
-validador: la comparación ya es exacta, sin normalizar mayúsculas ni
-espacios) y para YAML sintácticamente inválido, que se distingue como
-`ContractParseError` antes de llegar al esquema, con un mensaje accionable
-que antecede el detalle crudo de PyYAML (CA-07/CA-08). Queda pendiente el
-fail-fast ante violaciones múltiples de distinta naturaleza (CA-14) y las
-caracterizaciones aún no escritas de la frontera de lectura (CA-12), la
-invocación directa sin CLI (CA-13) y los fixtures sintéticos sin PII
-(CA-15).
+`_columnas_no_vacias`), para `archivos: []`/ausente/nula (CA-06/CA-07, M-04
+exacto, `_archivos_no_vacia`), para `archivos` presente pero no-lista
+(CA-09, M-03 exacto, guarda de tipo en `load_contract` antes de Pydantic),
+para el esquema viejo de un solo archivo (`columnas` residual en la raíz de
+`contract_data` sin `archivos` utilizable, CA-08, M-02 exacto), para
+`nombre` de columna duplicado por cadena exacta (`_columnas_sin_duplicados`:
+la comparación ya es exacta, sin normalizar mayúsculas ni espacios) y para
+YAML sintácticamente inválido, que se distingue como `ContractParseError`
+antes de llegar al esquema, con un mensaje accionable que antecede el
+detalle crudo de PyYAML (CA-07/CA-08).
+Queda pendiente el híbrido `columnas` residual + `archivos` utilizable
+(CA-28, M-13, Caso 10), el fail-fast ante violaciones múltiples de distinta
+naturaleza (CA-14) y las caracterizaciones aún no escritas de la frontera de
+lectura (CA-12), la invocación directa sin CLI (CA-13) y los fixtures
+sintéticos sin PII (CA-15).
 """
 from __future__ import annotations
 
@@ -52,9 +57,14 @@ class Columna(BaseModel):
     llave: bool
 
 
-class Contract(BaseModel):
-    """Contrato validado: lista de columnas en el orden declarado (CA-01)."""
+class ArchivoContrato(BaseModel):
+    """Un archivo declarativo del contrato: nombre y sus columnas (D-18).
 
+    Recibe (mudados desde `Contract`, sin reescribir su lógica ni mensajes)
+    los dos `field_validator` que validan las columnas de este archivo.
+    """
+
+    nombre: str
     columnas: list[Columna]
 
     @field_validator("columnas")
@@ -84,7 +94,34 @@ class Contract(BaseModel):
         return valor
 
 
+class Contract(BaseModel):
+    """Contrato validado: lista de archivos en el orden declarado (CA-01)."""
+
+    archivos: list[ArchivoContrato]
+
+    @field_validator("archivos")
+    @classmethod
+    def _archivos_no_vacia(cls, valor: list[ArchivoContrato]) -> list[ArchivoContrato]:
+        """Rechaza `archivos: []` (CA-06/CA-07); mensaje estable M-04."""
+        if not valor:
+            raise ValueError("la lista de archivos no puede estar vacía")
+        return valor
+
+
 _MENSAJE_YAML_INVALIDO = "el archivo YAML del contrato es sintácticamente inválido"
+_MENSAJE_RAIZ_INVALIDA = (
+    "la clave raíz 'contract_data' debe contener un mapa con la lista "
+    "'archivos' (se encontró: {cuerpo!r})"
+)
+_MENSAJE_ARCHIVOS_NO_LISTA = (
+    "'archivos' debe ser una lista (se encontró: {valor!r})"
+)
+_MENSAJE_ESQUEMA_VIEJO = (
+    "el contrato usa el esquema anterior de un solo archivo: se "
+    "encontró 'columnas' en la raíz de 'contract_data'; ahora las "
+    "columnas van dentro de 'archivos[]' "
+    "(contract_data.archivos[].columnas)"
+)
 
 
 class ContractParseError(Exception):
@@ -99,7 +136,7 @@ def load_contract(path: str | Path) -> Contract:
     """Lee, parsea y valida `path` como un `contract_data.yaml`.
 
     Única ruta que abre (frontera D-21, CA-12). Camino feliz: toma la clave
-    raíz `contract_data` -> `columnas`, valida con Pydantic y devuelve el
+    raíz `contract_data` -> `archivos`, valida con Pydantic y devuelve el
     `Contract` tipado.
     """
     with open(path, "r", encoding="utf-8") as fh:
@@ -110,11 +147,48 @@ def load_contract(path: str | Path) -> Contract:
                 f"{_MENSAJE_YAML_INVALIDO}: {exc}"
             ) from exc
 
-    # Clave raíz `contract_data` -> `columnas` (CA-01); ausencia de la clave
-    # o YAML vacío se trata más adelante como esquema mal formado (CA-11).
-    columnas = (crudo or {}).get("contract_data", {}).get("columnas", [])
+    # Extracción defensiva por tipo de la raíz (T-56, ampliado por D-25): se
+    # comprueba con `isinstance` que `contract_data` sea un mapa antes de
+    # tocarlo, para nunca encadenar `.get(...).get(...)` sobre un valor nulo
+    # o no-mapa y así jamás propagar un `AttributeError` (CA-19, CA-20).
+    raiz = crudo if isinstance(crudo, dict) else {}
+    cuerpo = raiz.get("contract_data")
+    if not isinstance(cuerpo, dict):
+        raise ContractSchemaError(_MENSAJE_RAIZ_INVALIDA.format(cuerpo=cuerpo))
+    # Residual del esquema viejo (TSK-21, Caso 9, D-25c): si `contract_data`
+    # todavía declara `columnas` en su raíz, se bifurca por la utilizabilidad
+    # de `archivos` ANTES de la normalización/guarda de abajo, para no dejar
+    # caer el flujo en silencio hacia M-04 (lista vacía). Rama 'archivos' NO
+    # utilizable (ausente, nula o lista vacía) -> M-02 aquí mismo. Rama
+    # 'archivos' SÍ utilizable (lista no vacía) queda deliberadamente sin
+    # bloquear -- es el híbrido M-13 del Caso 10 (TSK-23), fuera de alcance.
+    if "columnas" in cuerpo:
+        archivos_residual = cuerpo.get("archivos")
+        archivos_utilizable = (
+            isinstance(archivos_residual, list) and len(archivos_residual) > 0
+        )
+        if not archivos_utilizable:
+            raise ContractSchemaError(_MENSAJE_ESQUEMA_VIEJO)
+    # Ausente o nula (None) se normaliza a `[]` (TSK-17, Caso 7): así ambas
+    # caen en el mismo camino que la lista explícitamente vacía y producen el
+    # mensaje de negocio M-04, en vez de un error de tipo genérico de
+    # Pydantic para el caso nulo. No confundir con un valor no-lista (p. ej.
+    # una cadena), que es el Caso 8 (M-03), fuera de alcance aquí.
+    archivos = cuerpo.get("archivos", [])
+    if archivos is None:
+        archivos = []
+    # Guarda de tipo (TSK-19, Caso 8): si tras la normalización anterior
+    # `archivos` sigue presente pero no es una lista (p. ej. una cadena),
+    # se rechaza aquí con el mensaje de negocio M-03 antes de llegar a
+    # Pydantic, que solo reportaría un error de tipo genérico (`list_type`)
+    # no traducido por `_mensaje_esquema`. Una lista vacía `[]` no es
+    # no-lista y sigue su camino normal hacia M-04.
+    if not isinstance(archivos, list):
+        raise ContractSchemaError(
+            _MENSAJE_ARCHIVOS_NO_LISTA.format(valor=archivos)
+        )
     try:
-        return Contract.model_validate({"columnas": columnas})
+        return Contract.model_validate({"archivos": archivos})
     except ValidationError as exc:
         raise ContractSchemaError(_mensaje_esquema(exc)) from exc
 
@@ -138,6 +212,10 @@ def _mensaje_esquema(exc: ValidationError) -> str:
       ya es el texto estable definido por el validador; se propaga tal cual,
       sin la envoltura genérica "columna de índice ..., campo ...:" que no
       aplica porque el error no es de una columna concreta.
+    - `value_error` en el campo raíz `archivos` completo (`loc ==
+      ("archivos",)`): CA-06/CA-07, el `field_validator` `_archivos_no_vacia`
+      (M-04). Mismo trato que `columnas`: el mensaje ya es el texto estable
+      del validador, se propaga tal cual.
     - fallback genérico: cualquier otro `type` de error de Pydantic no
       cubierto arriba todavía.
     """
@@ -148,7 +226,7 @@ def _mensaje_esquema(exc: ValidationError) -> str:
     tipo_error = primer_error.get("type", "")
     msg = primer_error.get("msg", "")
 
-    if tipo_error == "value_error" and loc == ("columnas",):
+    if tipo_error == "value_error" and loc in (("columnas",), ("archivos",)):
         return msg.removeprefix("Value error, ")
     if tipo_error == "missing":
         return (
