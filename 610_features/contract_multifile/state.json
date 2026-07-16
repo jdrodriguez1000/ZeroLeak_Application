@@ -508,8 +508,10 @@
       "status": "pending"
     },
     "spec_verifier": {
-      "status": "pending",
-      "artifact": "verification.md"
+      "status": "done",
+      "artifact": "verification.md",
+      "veredicto": "CONFORME",
+      "desc": "Paso 12 (spec_verifier, contexto fresco): veredicto CONFORME. Suite ejecutada por el verificador (py -3.13 -m pytest app/tests -q): 111 passed / 0 failed; corrida de la feature (test_contract_multifile.py -v): 42 passed / 0 failed. Los 28 CA-xx quedan 'cubierto' con evidencia REAL ejecutada (0 parcial, 0 no cubierto): cada CA se trazo a test(s) identificables y todos los que dependen de un mensaje congelado M-xx lo fijan por igualdad EXACTA (assert str(exc)==...), verificado por lectura de las aserciones y por coincidencia caracter a caracter de las constantes _MENSAJE_*/_PLANTILLA_* de contract.py con la spec. Alcance auditado: frontera D-21 blindada por CA-23 (espia de open con guarda de no-vacuidad L-17, exactamente 1 apertura del propio YAML, nada bajo bronze/clients/.csv); C-01 auditada por CA-26 (fixtures sinteticos, listas blancas, ninguno bajo clients/*/data/); core-only D-23d por CA-27 (firma load_contract(path)->Contract sin estilo, sin fachada CLI); sin atajo Contract.columnas por CA-24; plantilla 600_template/contract_data.yaml reescrita al esquema archivos[] verificada por CA-22. Sin hallazgos bloqueantes. Observaciones informativas: (O-1) integration_tester figura 'pending' en state.json pero D-23d/core-only establece que no aplican tareas de integracion -- no es hueco de conformidad, se recomienda marcarlo not_applicable al cierre; (O-2) breaking de Contract.columnas ya aceptado en el gate del plan (paso 9), con 2 scripts obsoletos de config_contract a limpiar (T-69), fuera de alcance de esta verificacion. Sin etapa de retorno: procede el paso 13 (abrir PR) -> gate humano (human_test + merge_to_main, C-03)."
     },
     "human_test": {
       "status": "pending",
