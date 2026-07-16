@@ -48,7 +48,11 @@ ya enumera los 6 tipos permitidos), mismo patrón que la rama `missing` de
 nivel columna del párrafo anterior.
 Queda pendiente el fail-fast ante violaciones múltiples de distinta
 naturaleza y las caracterizaciones aún no escritas de la frontera de
-lectura, la invocación directa sin CLI y los fixtures sintéticos sin PII.
+lectura y los fixtures sintéticos sin PII. `load_contract(path) -> Contract`
+ya es invocable directo, sin fachada CLI (CA-27): su firma expone
+únicamente el parámetro `path` y anota su retorno como la clase `Contract`
+(módulo sin `from __future__ import annotations`, para que la anotación
+cruda de `inspect.signature` no quede diferida como cadena).
 """
 from enum import Enum
 from pathlib import Path
