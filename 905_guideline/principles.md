@@ -27,7 +27,7 @@ Principios de diseño de sistemas de agentes.
 
 ---
 
-## 2. Estándares de Comportamiento (E1–E12)
+## 2. Estándares de Comportamiento (E1–E13)
 
 Conceptos de comportamiento esperado del sistema de agentes.
 
@@ -103,6 +103,13 @@ Relevante para cualquier fase de investigación o recopilación de información:
 - Los subagentes operan con ventanas de contexto propias y frescas.
 - Las descripciones de tareas para subagentes deben incluir: objetivo, formato de salida esperado, herramientas disponibles y límites claros.
 - Sin descripciones detalladas, los subagentes duplican trabajo o toman caminos equivocados.
+
+### E13. Observabilidad y conformidad por subagente
+Operacionalización de P8 (*traces over intuition*) aplicada a los **agentes que construyen** el sistema, no solo al producto. Todo subagente de desarrollo debe ser observable y auditable de forma **automática** en cada invocación:
+- **Traza completa por invocación.** Cada subagente deja registro de su secuencia de herramientas, entradas, salidas y costo (tokens). La traza es la fuente de verdad de *qué hizo*; el auto-reporte del agente es narrativa, **no** evidencia.
+- **Conformidad determinista.** Las Reglas Vinculantes del prompt de cada agente se traducen en checks verificables sobre (traza + artefacto), evaluados automáticamente en cada invocación: responden *¿siguió el procedimiento?*.
+- **Conformidad ≠ calidad.** La conformidad determinista (procedimiento) se separa del juicio semántico de calidad (LLM-juez, E3), que solo aplica donde la salida es probabilística y no verificable mecánicamente.
+- Sin esta capa, un fallo de comportamiento de un agente solo se detecta por inspección humana ad hoc, nunca de forma sistemática.
 
 ---
 
