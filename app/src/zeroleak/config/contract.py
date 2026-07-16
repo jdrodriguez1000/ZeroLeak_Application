@@ -4,23 +4,29 @@
 contrato (única ruta que abre; frontera D-21), lo parsea con `yaml.safe_load`
 y valida su esquema con Pydantic, devolviendo un `Contract` tipado en memoria.
 
-Nota (paso 10, GREEN, TSK-09/TSK-13/TSK-15/TSK-17/TSK-19/TSK-20/TSK-21/TSK-22):
-esta versión cubre el camino feliz (CA-01 a CA-03: count, orden, fidelidad de
-campos y los 6 tipos del enum), la traducción de esquema para campo
-requerido faltante (CA-04/CA-05, fail-fast, `_mensaje_esquema`), para `tipo`
-fuera del enum cerrado (CA-06), para `columnas: []`/ausente (CA-11,
-`_columnas_no_vacias`), para `archivos: []`/ausente/nula (CA-06/CA-07, M-04
+Nota (paso 10, GREEN, TSK-09/TSK-13/TSK-15/TSK-17/TSK-19/TSK-20/TSK-21/TSK-22/
+TSK-23/TSK-25/TSK-27): esta versión cubre el camino feliz (CA-01 a CA-03:
+count, orden, fidelidad de campos y los 6 tipos del enum), la traducción de
+esquema para campo requerido faltante (CA-04/CA-05, fail-fast,
+`_mensaje_esquema`), para `tipo` fuera del enum cerrado (CA-06), para
+`columnas: []`/ausente a nivel de archivo (CA-11, `_columnas_no_vacias`,
+M-07 exacto localizando el archivo por índice + nombre con
+`_localizador_archivo`), para `archivos: []`/ausente/nula (CA-06/CA-07, M-04
 exacto, `_archivos_no_vacia`), para `archivos` presente pero no-lista
 (CA-09, M-03 exacto, guarda de tipo en `load_contract` antes de Pydantic),
 para el esquema viejo de un solo archivo (`columnas` residual en la raíz de
-`contract_data` sin `archivos` utilizable, CA-08, M-02 exacto), para
+`contract_data` sin `archivos` utilizable, CA-08, M-02 exacto), para el
+esquema híbrido (`columnas` residual en la raíz Y `archivos` utilizable a
+la vez, CA-28, M-13 exacto, `_MENSAJE_HIBRIDO`, rama complementaria y
+disjunta de M-02 dentro del mismo bloque `if "columnas" in cuerpo:`), para
 `nombre` de columna duplicado por cadena exacta (`_columnas_sin_duplicados`:
-la comparación ya es exacta, sin normalizar mayúsculas ni espacios) y para
+la comparación ya es exacta, sin normalizar mayúsculas ni espacios), para
 YAML sintácticamente inválido, que se distingue como `ContractParseError`
 antes de llegar al esquema, con un mensaje accionable que antecede el
-detalle crudo de PyYAML (CA-07/CA-08).
-Queda pendiente el híbrido `columnas` residual + `archivos` utilizable
-(CA-28, M-13, Caso 10), el fail-fast ante violaciones múltiples de distinta
+detalle crudo de PyYAML (CA-07/CA-08), y para un archivo sin `nombre` dentro
+de `archivos[]` (CA-10, M-06 exacto, `_localizador_archivo` degradando
+limpio a `archivo[i]` cuando no hay nombre que mostrar, D-25a).
+Queda pendiente el fail-fast ante violaciones múltiples de distinta
 naturaleza (CA-14) y las caracterizaciones aún no escritas de la frontera de
 lectura (CA-12), la invocación directa sin CLI (CA-13) y los fixtures
 sintéticos sin PII (CA-15).
@@ -122,6 +128,12 @@ _MENSAJE_ESQUEMA_VIEJO = (
     "columnas van dentro de 'archivos[]' "
     "(contract_data.archivos[].columnas)"
 )
+_MENSAJE_HIBRIDO = (
+    "el contrato declara 'archivos[]' y además un 'columnas' "
+    "residual en la raíz de 'contract_data': ese bloque no se valida "
+    "ni se audita; elimínelo y deje cada columna dentro del archivo "
+    "al que pertenece (contract_data.archivos[].columnas)"
+)
 
 
 class ContractParseError(Exception):
@@ -160,8 +172,9 @@ def load_contract(path: str | Path) -> Contract:
     # de `archivos` ANTES de la normalización/guarda de abajo, para no dejar
     # caer el flujo en silencio hacia M-04 (lista vacía). Rama 'archivos' NO
     # utilizable (ausente, nula o lista vacía) -> M-02 aquí mismo. Rama
-    # 'archivos' SÍ utilizable (lista no vacía) queda deliberadamente sin
-    # bloquear -- es el híbrido M-13 del Caso 10 (TSK-23), fuera de alcance.
+    # 'archivos' SÍ utilizable (lista no vacía) es el híbrido M-13 (Caso 10,
+    # TSK-23, D-26): el residual `columnas` nunca se ignora en silencio, se
+    # rechaza aquí mismo, contigua y disjunta de la rama M-02 de arriba.
     if "columnas" in cuerpo:
         archivos_residual = cuerpo.get("archivos")
         archivos_utilizable = (
@@ -169,6 +182,7 @@ def load_contract(path: str | Path) -> Contract:
         )
         if not archivos_utilizable:
             raise ContractSchemaError(_MENSAJE_ESQUEMA_VIEJO)
+        raise ContractSchemaError(_MENSAJE_HIBRIDO)
     # Ausente o nula (None) se normaliza a `[]` (TSK-17, Caso 7): así ambas
     # caen en el mismo camino que la lista explícitamente vacía y producen el
     # mensaje de negocio M-04, en vez de un error de tipo genérico de
@@ -190,10 +204,31 @@ def load_contract(path: str | Path) -> Contract:
     try:
         return Contract.model_validate({"archivos": archivos})
     except ValidationError as exc:
-        raise ContractSchemaError(_mensaje_esquema(exc)) from exc
+        raise ContractSchemaError(_mensaje_esquema(exc, archivos)) from exc
 
 
-def _mensaje_esquema(exc: ValidationError) -> str:
+def _localizador_archivo(indice: object, archivos_crudos: list) -> str:
+    """Devuelve `archivo[i] 'nombre'`, degradando a `archivo[i]` (D-25a).
+
+    Recupera el `nombre` del YAML crudo (no del modelo validado, que puede no
+    existir todavía) por índice; si el índice no es válido, o el archivo
+    crudo no declara un `nombre` que sea `str` no vacío, degrada limpio a
+    `archivo[i]` sin el nombre.
+    """
+    archivo_crudo = None
+    if isinstance(indice, int) and 0 <= indice < len(archivos_crudos):
+        archivo_crudo = archivos_crudos[indice]
+    nombre = None
+    if isinstance(archivo_crudo, dict):
+        candidato = archivo_crudo.get("nombre")
+        if isinstance(candidato, str) and candidato:
+            nombre = candidato
+    if nombre is not None:
+        return f"archivo[{indice}] '{nombre}'"
+    return f"archivo[{indice}]"
+
+
+def _mensaje_esquema(exc: ValidationError, archivos_crudos: list) -> str:
     """Traduce el primer error de Pydantic a un mensaje legible (fail-fast).
 
     Toma `exc.errors()[0]` (D-23c: un solo primer error, sin lista agregada) y
@@ -216,6 +251,17 @@ def _mensaje_esquema(exc: ValidationError) -> str:
       ("archivos",)`): CA-06/CA-07, el `field_validator` `_archivos_no_vacia`
       (M-04). Mismo trato que `columnas`: el mensaje ya es el texto estable
       del validador, se propaga tal cual.
+    - `value_error` de nivel archivo en el campo `columnas` completo (`loc ==
+      ("archivos", i, "columnas")`): CA-11, M-07. El `field_validator`
+      `_columnas_no_vacias` mudado a `ArchivoContrato` rechaza la lista vacía
+      *de ese archivo*; se antepone `_localizador_archivo(i, archivos_crudos)`
+      al mensaje del validador, sin la envoltura genérica de "columna de
+      índice ..., campo ..." que no aplica (el error no es de una columna
+      concreta, sino del campo `columnas` del archivo entero).
+    - `missing` de nivel archivo (`loc == ("archivos", i, "nombre")`): CA-10,
+      M-06. El archivo no declara `nombre`; se localiza con
+      `_localizador_archivo(i, archivos_crudos)`, que degrada limpio a
+      `archivo[i]` (D-25a) porque justo el campo que falta es el `nombre`.
     - fallback genérico: cualquier otro `type` de error de Pydantic no
       cubierto arriba todavía.
     """
@@ -228,6 +274,12 @@ def _mensaje_esquema(exc: ValidationError) -> str:
 
     if tipo_error == "value_error" and loc in (("columnas",), ("archivos",)):
         return msg.removeprefix("Value error, ")
+    if tipo_error == "value_error" and len(loc) == 3 and loc[0] == "archivos" and loc[2] == "columnas":
+        localizador = _localizador_archivo(indice, archivos_crudos)
+        return f"{localizador}: {msg.removeprefix('Value error, ')}"
+    if tipo_error == "missing" and len(loc) == 3 and loc[0] == "archivos" and loc[2] == "nombre":
+        localizador = _localizador_archivo(indice, archivos_crudos)
+        return f"{localizador}: falta el campo requerido '{campo}' ({msg})"
     if tipo_error == "missing":
         return (
             f"falta el campo requerido '{campo}' en la columna de índice {indice} "

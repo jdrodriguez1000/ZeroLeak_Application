@@ -15,9 +15,10 @@ tiempos** (plan.md, "Estrategia de migración de los tests"):
    salvo donde el propio comportamiento bajo prueba exige varios archivos) y
    toda lectura pasa de `contrato.columnas` a `contrato.archivos[i].columnas`.
    Las aserciones heredadas ya eran de **subcadena** y sobreviven al
-   traductor genérico; la única excepción es la aserción de igualdad exacta
-   de `columnas: []`, que aquí se **relaja temporalmente a subcadena** (se
-   endurece al texto literal M-07 en el Caso 12).
+   traductor genérico; la única excepción era la aserción de igualdad
+   exacta de `columnas: []`, que en este primer tiempo se relajó
+   temporalmente a subcadena. **Ya endurecida** al texto literal M-07 en
+   el Caso 12 (`test_load_contract_columnas_vacias_en_archivo_m07`).
 2. **Endurecimiento por caso:** cada test se reescribe al texto literal
    M-xx en el caso que especifica su comportamiento equivalente (ver el
    inventario de migración de plan.md). **No** se hace aquí.
@@ -542,6 +543,142 @@ def test_load_contract_esquema_viejo_m02(
     assert str(exc_info.value) != "la lista de archivos no puede estar vacía"
 
 
+def test_load_contract_hibrido_archivos_y_columnas_residual_m13(
+    write_contract_yaml: Callable[..., Path],
+) -> None:
+    """Caso 10 (TSK-22, CA-28): YAML **híbrido** -- `contract_data.archivos`
+    es una lista **no vacía** que, por sí sola, cargaría sin error (un
+    archivo declarativo sintético con una columna válida y completa) --
+    **y además** `contract_data` declara en su raíz un bloque `columnas`
+    residual del esquema viejo. `load_contract` debe lanzar
+    `ContractSchemaError` con el texto literal **M-13** exacto (avisa de
+    los dos bloques y de qué hacer) y **no** retornar ningún objeto
+    `Contract`; el residual **nunca** se ignora en silencio (D-26).
+
+    Caso disjunto de CA-08/Caso 9 (`test_load_contract_esquema_viejo_m02`):
+    allí `archivos` está ausente (no hay `archivos` utilizable) y el
+    mensaje es M-02; aquí sí hay una `archivos` utilizable (lista no
+    vacía) y el mensaje es M-13. El test verifica explícitamente que
+    ambos fixtures producen mensajes **distintos** (disyunción exigida
+    por TSK-22/D-26).
+
+    Este caso **espera código real** (no es caracterización; plan.md lo
+    lista junto a 1/6/7/8/9/10/11/12/14/16/17/23; TSK-23 es la única
+    tarea de la feature sin código prototipado en el spike, nota de
+    riesgo de D-26). Hoy `load_contract` (`contract.py`) solo bifurca por
+    `"columnas" in cuerpo` para lanzar M-02 cuando `archivos` **no** es
+    utilizable (TSK-21, Caso 9); cuando `archivos` **sí** es una lista no
+    vacía, esa rama simplemente no bloquea y el flujo cae directo a
+    `Contract.model_validate({"archivos": archivos})`, que valida bien
+    (una columna sintética completa) y devuelve un `Contract` -- el
+    bloque `columnas` residual de la raíz se ignora en silencio, sin
+    lanzar ninguna excepción. Por tanto `pytest.raises(ContractSchemaError)`
+    debe fallar hoy con `DID NOT RAISE` (no `ImportError` ni error de
+    sintaxis del test): es exactamente el defecto que TSK-23 (`tdd_coder`,
+    GREEN) debe cerrar con la rama pre-Pydantic contigua y disjunta de
+    M-02, condicionada a `archivos_utilizable`.
+    """
+    texto = (
+        "contract_data:\n"
+        "  archivos:\n"
+        f"    - nombre: {_NOMBRE_ARCHIVO_UNICO}\n"
+        "      columnas:\n"
+        "        - nombre: test_id\n"
+        "          tipo: integer\n"
+        "          nulable: false\n"
+        "          llave: true\n"
+        "  columnas:\n"
+        "    - nombre: residual_id\n"
+        "      tipo: integer\n"
+        "      nulable: false\n"
+        "      llave: true\n"
+    )
+    path = write_contract_yaml(texto=texto)
+
+    with pytest.raises(ContractSchemaError) as exc_info:
+        load_contract(path)
+
+    mensaje_esperado = (
+        "el contrato declara 'archivos[]' y además un 'columnas' "
+        "residual en la raíz de 'contract_data': ese bloque no se valida "
+        "ni se audita; elimínelo y deje cada columna dentro del archivo "
+        "al que pertenece (contract_data.archivos[].columnas)"
+    )
+    assert str(exc_info.value) == mensaje_esperado
+
+    texto_esquema_viejo = (
+        "contract_data:\n"
+        "  columnas:\n"
+        "    - nombre: test_id\n"
+        "      tipo: integer\n"
+        "      nulable: false\n"
+        "      llave: true\n"
+        "    - nombre: correo\n"
+        "      tipo: string\n"
+        "      nulable: true\n"
+        "      llave: false\n"
+    )
+    path_esquema_viejo = write_contract_yaml(texto=texto_esquema_viejo)
+    with pytest.raises(ContractSchemaError) as exc_info_esquema_viejo:
+        load_contract(path_esquema_viejo)
+
+    assert str(exc_info_esquema_viejo.value) != mensaje_esperado
+
+
+def test_load_contract_archivo_sin_nombre_m06(
+    write_contract_yaml: Callable[..., Path],
+) -> None:
+    """Caso 11 (TSK-24, CA-10): YAML de **2** archivos donde el **segundo**
+    (índice 1) omite la clave `nombre` -> `ContractSchemaError` con el texto
+    literal **M-06** exacto (`archivo[1]: falta el campo requerido 'nombre'
+    (Field required)`): el localizador **degrada limpio al índice** cuando
+    no hay `nombre` con qué identificar el archivo (D-25a).
+
+    YAML sintético (sin PII, C-01): `archivos[0]` (`clientes.csv`) es válido
+    y completo (nombre + una columna completa); `archivos[1]` declara
+    `columnas` (una columna válida y completa) pero **no** declara `nombre`.
+    Sin `columnas` residual en la raíz de `contract_data` (para no disparar
+    M-02/M-13, fuera de alcance de este caso).
+
+    Este caso **espera código real** (no es caracterización; plan.md lo
+    lista junto a 1/6/7/8/9/10/11/12/14/16/17/23): hoy `_mensaje_esquema` no
+    conoce ningún localizador `archivo[i]` -- la rama `missing` de nivel
+    archivo (`loc == ("archivos", i, "nombre")`) no existe todavía (TSK-25,
+    diferida) -- así que Pydantic sí rechaza el archivo sin `nombre`
+    (`ValidationError`, `type == "missing"`, `loc == ("archivos", 1,
+    "nombre")`) y `load_contract` sí lanza `ContractSchemaError`, pero el
+    traductor cae al `fallback` genérico (`columna de índice ?, campo
+    'nombre': Field required`), que **no** coincide con el texto literal
+    M-06 -- la aserción de igualdad exacta de mensaje falla. No es un
+    `ImportError` ni un error de sintaxis del test: es exactamente el
+    defecto que TSK-25 (`tdd_coder`, GREEN) debe cerrar con
+    `_localizador_archivo(indice, archivos_crudos)` + la rama `missing` de
+    nivel archivo del traductor.
+    """
+    texto = (
+        "contract_data:\n"
+        "  archivos:\n"
+        "    - nombre: clientes.csv\n"
+        "      columnas:\n"
+        "        - nombre: cliente_id\n"
+        "          tipo: integer\n"
+        "          nulable: false\n"
+        "          llave: true\n"
+        "    - columnas:\n"
+        "        - nombre: venta_id\n"
+        "          tipo: integer\n"
+        "          nulable: false\n"
+        "          llave: true\n"
+    )
+    path = write_contract_yaml(texto=texto)
+
+    with pytest.raises(ContractSchemaError) as exc_info:
+        load_contract(path)
+
+    mensaje_esperado = "archivo[1]: falta el campo requerido 'nombre' (Field required)"
+    assert str(exc_info.value) == mensaje_esperado
+
+
 def test_load_contract_campo_tipo_faltante(
     write_contract_yaml: Callable[..., Path],
 ) -> None:
@@ -641,27 +778,61 @@ def test_load_contract_otros_campos_faltantes(
     assert "1" in mensaje
 
 
-def test_load_contract_lista_vacia(
+def test_load_contract_columnas_vacias_en_archivo_m07(
     write_contract_yaml: Callable[..., Path],
 ) -> None:
-    """Destino final: Caso 12 (CA-11, M-07): `columnas: []` (lista vacía)
-    dentro de un archivo -> `ContractSchemaError` (TSK-03: forma migrada).
+    """Caso 12 (TSK-26, CA-11): `archivos[1]` (`ventas.csv`) declara
+    `columnas: []` -> `ContractSchemaError` con el texto literal **M-07**
+    exacto (`archivo[1] 'ventas.csv': la lista de columnas no puede estar
+    vacía`): el localizador identifica el archivo por **índice y nombre**
+    (D-25a), no solo por índice como en M-06 (Caso 11, archivo sin
+    `nombre`).
 
-    **Aserción TEMPORALMENTE relajada a subcadena** (era igualdad exacta en
-    el esquema viejo): en la forma multi-archivo el mensaje final incluirá el
-    localizador `archivo[i] '<nombre>'` (M-07), que este caso todavía no
-    fija. Se endurece a la igualdad exacta del texto literal M-07 en el
-    Caso 12 (plan.md, "Estrategia de migración de los tests").
+    **Endurece a igualdad exacta** la aserción de subcadena que TSK-03
+    (Caso 1, migración de forma) dejó deliberadamente relajada en este
+    mismo test (entonces `test_load_contract_lista_vacia`, ver
+    plan.md "Estrategia de migración de los tests" e inventario de
+    migración). Reemplaza ese test: mismo comportamiento (`columnas: []`),
+    ahora con el fixture de **2** archivos que exige el texto literal
+    (`archivos[0]` válido, `archivos[1]` con `columnas` vacía) en vez del
+    de un solo archivo (que solo probaba la subcadena).
 
-    YAML sintético (sin PII, C-01) con `contract_data.archivos[0].columnas`
-    presente pero vacía. La excepción debe ser exactamente
-    `ContractSchemaError` (no un `pydantic.ValidationError` crudo);
-    `load_contract` no debe retornar objeto (se lanza la excepción).
+    YAML sintético (sin PII, C-01): `archivos[0]` (`clientes.csv`) es
+    válido y completo (nombre + una columna completa); `archivos[1]`
+    (`ventas.csv`) declara `nombre` pero su `columnas` es la lista vacía.
+    Sin `columnas` residual en la raíz de `contract_data` (para no disparar
+    M-02/M-13, fuera de alcance de este caso). La excepción debe ser
+    exactamente `ContractSchemaError` (no un `pydantic.ValidationError`
+    crudo); `load_contract` no debe retornar objeto.
+
+    Este caso **espera código real** (no es caracterización; plan.md lo
+    lista junto a 1/6/7/8/9/10/11/12/14/16/17/23): el `field_validator`
+    `_columnas_no_vacias` (mudado a `ArchivoContrato` desde TSK-05, Caso 1)
+    sí rechaza la lista vacía y sí lanza `ContractSchemaError`, pero
+    `_mensaje_esquema` de hoy solo reconoce el `loc` plano `("columnas",)`
+    para propagar el mensaje del validador sin envoltura (línea vigente
+    `loc in (("columnas",), ("archivos",))`); en la forma multi-archivo,
+    Pydantic reporta `loc == ("archivos", 1, "columnas")` (anidado dentro
+    de `ArchivoContrato`), que **no** coincide con ese `loc` plano y por lo
+    tanto cae al `fallback` genérico de columna (`columna de índice ?,
+    campo 'columnas': ...`), sin el localizador `archivo[i] '<nombre>'` que
+    exige M-07. La aserción de igualdad exacta de mensaje falla: no es un
+    `ImportError` ni un error de sintaxis del test, sino exactamente el
+    defecto que TSK-27 (`tdd_coder`, GREEN) debe cerrar añadiendo la rama
+    `value_error` de **nivel archivo** (`loc == ("archivos", i,
+    "columnas")`) que antepone `_localizador_archivo` (TSK-25, ya
+    implementado) al mensaje del validador mudado.
     """
     texto = (
         "contract_data:\n"
         "  archivos:\n"
-        f"    - nombre: {_NOMBRE_ARCHIVO_UNICO}\n"
+        "    - nombre: clientes.csv\n"
+        "      columnas:\n"
+        "        - nombre: cliente_id\n"
+        "          tipo: integer\n"
+        "          nulable: false\n"
+        "          llave: true\n"
+        "    - nombre: ventas.csv\n"
         "      columnas: []\n"
     )
     path = write_contract_yaml(texto=texto)
@@ -669,11 +840,10 @@ def test_load_contract_lista_vacia(
     with pytest.raises(ContractSchemaError) as exc_info:
         load_contract(path)
 
-    mensaje = str(exc_info.value)
-    # Relajado a subcadena (TSK-03); se endurece a igualdad exacta con el
-    # texto literal M-07 (incl. localizador `archivo[i] '<nombre>'`) en el
-    # Caso 12 (CA-11).
-    assert "la lista de columnas no puede estar vacía" in mensaje
+    mensaje_esperado = (
+        "archivo[1] 'ventas.csv': la lista de columnas no puede estar vacía"
+    )
+    assert str(exc_info.value) == mensaje_esperado
 
 
 def test_load_contract_tipo_fuera_de_enum(
