@@ -1592,14 +1592,18 @@ def test_load_contract_core_invocable_sin_cli(
     comando `zlk contract validate` en esta feature (core-only, D-23d;
     TSK-03: forma migrada).
 
-    Tres verificaciones:
+    Cuatro verificaciones:
 
     1. **Invocación directa:** se llama `load_contract(path)` en proceso,
        reutilizando el fixture válido de camino feliz (envuelto en un único
        archivo); el resultado es una instancia de `Contract`.
-    2. **Firma:** `inspect.signature(load_contract)` expone exactamente un
-       parámetro llamado `path`.
-    3. **Sin fachada CLI:** `zeroleak.cli` no registra ningún subcomando
+    2. **Firma — parámetros:** `inspect.signature(load_contract)` expone
+       exactamente un parámetro llamado `path` (**sin** `estilo`, que era
+       solo del spike, D-23d/CA-27).
+    3. **Firma — anotación de retorno:** `inspect.signature(load_contract)
+       .return_annotation` es exactamente la clase `Contract` (no `Any`,
+       no ausente, no una cadena/forward-ref sin resolver).
+    4. **Sin fachada CLI:** `zeroleak.cli` no registra ningún subcomando
        `contract`, ni el texto de uso (`_USAGE`) menciona la palabra
        "contract".
     """
@@ -1616,6 +1620,12 @@ def test_load_contract_core_invocable_sin_cli(
     assert nombres_parametros == ["path"], (
         f"load_contract debe declarar exactamente el parámetro 'path'; "
         f"parámetros observados: {nombres_parametros}"
+    )
+
+    # (3) Firma: la anotación de retorno es exactamente la clase `Contract`.
+    assert firma.return_annotation is Contract, (
+        f"load_contract debe anotar su retorno como 'Contract' exactamente; "
+        f"anotación observada: {firma.return_annotation!r}"
     )
 
     # (3) Sin fachada CLI: ningún símbolo ni el texto de uso mencionan "contract".
