@@ -1847,3 +1847,91 @@ def test_contract_no_expone_columnas(
         "Contract(...).columnas no debe existir como atributo accesible "
         "(D-25d); hasattr reporta presencia inesperada del atributo"
     )
+
+
+def test_load_contract_plantilla_real_carga() -> None:
+    """Caso 23 (TSK-43, CA-22): `load_contract` sobre la plantilla **real y
+    versionada** del repo `600_template/contract_data.yaml` (T-58) no lanza
+    excepción y devuelve `len(archivos) >= 1`, con cada archivo declarando
+    `nombre` no vacío y `columnas` no vacía; la plantilla declara
+    `contract_data.archivos` y **no** `contract_data.columnas`.
+
+    **Excepción declarada a C-01** (nota técnica 4 del plan, gate paso 9):
+    este es el único test de la feature que abre un archivo real del repo
+    en vez de un fixture sintético en `tmp_path` -- la plantilla es en sí
+    misma sintética (sin PII, solo columnas de ejemplo) y está versionada,
+    así que su lectura no viola la regla "Datos en Bóveda". La ruta se
+    resuelve desde la raíz del proyecto vía
+    `Path(__file__).resolve().parents[2]` (este archivo vive en
+    `app/tests/`, por lo que `parents[0]` es `app/tests`, `parents[1]` es
+    `app` y `parents[2]` es la raíz del repo, verificado manualmente antes
+    de escribir este test: la ruta resultante existe).
+
+    Este caso **espera código real** (no es caracterización; plan.md lo
+    lista explícitamente junto a 1/6/7/8/9/10/11/12/14/16/17/23; TSK-44 es
+    la tarea hermana de `tdd_coder`, **fuera de alcance de este test**): la
+    plantilla vigente en el repo (`600_template/contract_data.yaml`) todavía
+    usa el **esquema viejo** (`contract_data.columnas`, sin `archivos`), tal
+    como quedó de la feature `config_contract`. Por tanto:
+
+    - `load_contract(ruta_plantilla)` hoy lanza `ContractSchemaError` con el
+      mensaje **M-02** (Caso 9, ya GREEN: "el contrato usa el esquema
+      anterior de un solo archivo..."), en vez de devolver un `Contract` ->
+      la aserción `len(contrato.archivos) >= 1` nunca se alcanza, el test
+      falla en la llamada a `load_contract` misma (`pytest.raises` NO se usa
+      aquí porque el comportamiento esperado, una vez TSK-44 reescriba la
+      plantilla, es la ausencia de excepción -- así que hoy la excepción
+      real se propaga sin capturar y pytest la reporta como un fallo,
+      exactamente la razón correcta, no un `ImportError` ni un error de
+      sintaxis del test).
+    - Independientemente de eso, una lectura cruda del YAML confirma que la
+      plantilla declara `columnas` en la raíz de `contract_data` y **no**
+      declara `archivos`: la aserción final de este test (`"archivos" in
+      cuerpo and "columnas" not in cuerpo`) también falla hoy, en sentido
+      inverso al que exige CA-22.
+
+    TSK-44 (`tdd_coder`, GREEN) debe reescribir `600_template/contract_data.yaml`
+    al esquema `archivos[]` (T-58, celda 13 del spike) para que ambas
+    aserciones -- la carga sin excepción y la forma de la clave raíz --
+    pasen a verde.
+    """
+    import yaml
+
+    ruta_plantilla = (
+        Path(__file__).resolve().parents[2] / "600_template" / "contract_data.yaml"
+    )
+    assert ruta_plantilla.exists(), (
+        f"la plantilla real y versionada del repo debe existir en "
+        f"{ruta_plantilla} (T-58); si esta ruta no existe, el plan pide un "
+        f"fallback legible en vez de un FileNotFoundError críptico"
+    )
+
+    contrato = load_contract(ruta_plantilla)
+
+    assert len(contrato.archivos) >= 1, (
+        "la plantilla real debe declarar al menos un archivo en "
+        "'archivos[]' (CA-22)"
+    )
+    for archivo in contrato.archivos:
+        assert archivo.nombre != "", (
+            f"cada archivo de la plantilla debe declarar un 'nombre' no "
+            f"vacío; archivo observado: {archivo!r}"
+        )
+        assert len(archivo.columnas) > 0, (
+            f"cada archivo de la plantilla debe declarar 'columnas' no "
+            f"vacía; archivo {archivo.nombre!r} observado sin columnas"
+        )
+
+    # La plantilla declara `contract_data.archivos` y NO `contract_data.columnas`
+    # (lectura cruda, independiente de si `load_contract` ya valida o no).
+    crudo = yaml.safe_load(ruta_plantilla.read_text(encoding="utf-8"))
+    cuerpo = crudo["contract_data"]
+    assert "archivos" in cuerpo, (
+        "la plantilla debe declarar 'contract_data.archivos' (T-58); "
+        f"claves observadas en la raíz de contract_data: {sorted(cuerpo)!r}"
+    )
+    assert "columnas" not in cuerpo, (
+        "la plantilla NO debe declarar 'contract_data.columnas' (esquema "
+        f"viejo, T-58 la reescribe); claves observadas en la raíz de "
+        f"contract_data: {sorted(cuerpo)!r}"
+    )
