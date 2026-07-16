@@ -1512,45 +1512,73 @@ def test_load_contract_parse_error_mensaje_accionable(
 @pytest.mark.parametrize(
     "texto",
     [
-        # Contrato válido (camino feliz), un solo archivo.
+        # Contrato MULTI-ARCHIVO válido (camino feliz): nombra clientes.csv
+        # y ventas.csv (TSK-45, Caso 24), sin que ninguno de los dos exista
+        # físicamente ni se abra -- son solo cadenas declarativas (D-21).
         (
             "contract_data:\n"
             "  archivos:\n"
-            f"    - nombre: {_NOMBRE_ARCHIVO_UNICO}\n"
+            "    - nombre: clientes.csv\n"
             "      columnas:\n"
-            "        - nombre: test_id\n"
+            "        - nombre: cliente_id\n"
+            "          tipo: integer\n"
+            "          nulable: false\n"
+            "          llave: true\n"
+            "    - nombre: ventas.csv\n"
+            "      columnas:\n"
+            "        - nombre: venta_id\n"
             "          tipo: integer\n"
             "          nulable: false\n"
             "          llave: true\n"
         ),
-        # Contrato inválido (columna sin `tipo`, dispara ContractSchemaError).
+        # Contrato MULTI-ARCHIVO inválido (clientes.csv válido, ventas.csv con
+        # una columna sin `tipo` -- dispara ContractSchemaError, TSK-45).
         (
             "contract_data:\n"
             "  archivos:\n"
-            f"    - nombre: {_NOMBRE_ARCHIVO_UNICO}\n"
+            "    - nombre: clientes.csv\n"
             "      columnas:\n"
-            "        - nombre: correo\n"
+            "        - nombre: cliente_id\n"
+            "          tipo: integer\n"
+            "          nulable: false\n"
+            "          llave: true\n"
+            "    - nombre: ventas.csv\n"
+            "      columnas:\n"
+            "        - nombre: monto\n"
             "          nulable: true\n"
             "          llave: false\n"
         ),
     ],
-    ids=["valido", "invalido_campo_faltante"],
+    ids=["valido_multi_archivo", "invalido_multi_archivo_campo_faltante"],
 )
-def test_load_contract_frontera_no_toca_bronze(
+def test_load_contract_frontera_no_toca_bronze_con_guarda(
     write_contract_yaml: Callable[..., Path],
     monkeypatch: pytest.MonkeyPatch,
     texto: str,
 ) -> None:
-    """Destino final: Caso 24 (CA-23, guarda L-17): frontera D-21 -- `load_contract`
-    no abre ni referencia ninguna ruta bajo `data/bronze/` ni datos reales
-    del cliente (TSK-03: forma migrada).
+    """Destino final: Caso 24 (CA-23, TSK-45, guarda L-17): frontera D-21 --
+    `load_contract` no abre ni referencia ninguna ruta bajo `data/bronze/`,
+    ninguna bajo `clients/`, ni ningún `.csv`, al cargar un contrato
+    **multi-archivo** que nombra (declarativamente, sin emparejar con el
+    filesystem) `clientes.csv` y `ventas.csv`.
 
-    Instrumenta la apertura de archivos con un espía sobre `open`. Se
-    ejecuta `load_contract` tanto sobre un fixture válido como sobre uno
-    inválido (capturada aquí para poder inspeccionar igualmente las rutas
-    abiertas) y se verifica que: se abrió exactamente **una** ruta (guarda de
-    no-vacuidad, L-17), esa única ruta abierta es el propio `path`, y
-    **ninguna** ruta abierta contiene el segmento `data/bronze`.
+    Instrumenta la apertura de archivos con un espía sobre `open` (bajo
+    pytest el `monkeypatch` sobre `builtins.open` SÍ funciona; el fallo de
+    L-17 era exclusivo del kernel de Jupyter, plan.md nota técnica 8). Se
+    ejecuta `load_contract` tanto sobre el fixture multi-archivo válido como
+    sobre el inválido (capturando `ContractSchemaError` para poder inspeccionar
+    igualmente las rutas abiertas) y se verifica, en este orden:
+
+    1. **Guarda de no-vacuidad primero (L-17):** el espía observó **al
+       menos una** apertura -- si no, los asserts de ausencia de abajo
+       pasarían en vacío (evidencia vacua), tal como advierte L-17.
+    2. Se abrió **exactamente una** ruta, y es el propio `path` del
+       `contract_data.yaml`.
+    3. Ninguna ruta abierta contiene el segmento `data/bronze` (D-21).
+    4. Ninguna ruta abierta contiene el segmento `clients/` (C-01/D-21).
+    5. Ninguna ruta abierta termina en `.csv` -- `load_contract` nunca abre
+       los archivos de datos que solo *nombra* (`clientes.csv`/`ventas.csv`
+       son cadenas declarativas, no rutas emparejadas con el filesystem).
     """
     path = write_contract_yaml(texto=texto)
 
@@ -1570,15 +1598,37 @@ def test_load_contract_frontera_no_toca_bronze(
         # aunque falle la validación de esquema (la apertura ya ocurrió).
         pass
 
+    # (1) Guarda de no-vacuidad PRIMERO (L-17): sin esto, los asserts de
+    # ausencia de más abajo pasarían en vacío si el espía no observó nada.
+    assert len(rutas_abiertas) >= 1, (
+        "el espía sobre `open` no observó ninguna apertura -- guarda de "
+        "no-vacuidad (L-17) incumplida: los asserts de ausencia de bronze "
+        "serían vacuos si se afirmaran sin esta comprobación previa."
+    )
+
+    # (2) Exactamente una apertura, y es el propio contract_data.yaml.
     assert rutas_abiertas == [str(path)], (
         f"load_contract debe abrir únicamente su propio contract_data.yaml "
         f"({path}); rutas abiertas observadas: {rutas_abiertas}"
     )
+
+    # (3)-(5) Ausencia de bronze/clients/.csv, ahora que (1) garantiza que
+    # esta comprobación no es vacua.
     for ruta in rutas_abiertas:
         ruta_normalizada = ruta.replace("\\", "/")
         assert "data/bronze" not in ruta_normalizada, (
             f"load_contract no debe abrir ninguna ruta bajo data/bronze/ "
             f"(frontera D-21); ruta observada: {ruta!r}"
+        )
+        assert "clients/" not in ruta_normalizada, (
+            f"load_contract no debe abrir ninguna ruta bajo clients/ "
+            f"(C-01/D-21); ruta observada: {ruta!r}"
+        )
+        assert not ruta_normalizada.lower().endswith(".csv"), (
+            f"load_contract no debe abrir ningún .csv -- 'clientes.csv' y "
+            f"'ventas.csv' son solo cadenas declarativas del contrato, "
+            f"nunca rutas emparejadas con el filesystem (D-21); ruta "
+            f"observada: {ruta!r}"
         )
 
 
