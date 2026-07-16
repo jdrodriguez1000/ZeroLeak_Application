@@ -50,8 +50,6 @@ Queda pendiente el fail-fast ante violaciones múltiples de distinta
 naturaleza y las caracterizaciones aún no escritas de la frontera de
 lectura, la invocación directa sin CLI y los fixtures sintéticos sin PII.
 """
-from __future__ import annotations
-
 from enum import Enum
 from pathlib import Path
 
