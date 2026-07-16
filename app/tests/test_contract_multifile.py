@@ -1985,3 +1985,148 @@ def test_load_contract_plantilla_real_carga() -> None:
         f"viejo, T-58 la reescribe); claves observadas en la raíz de "
         f"contract_data: {sorted(cuerpo)!r}"
     )
+
+
+# Funciones EXENTAS de la auditoría: usan `contract_data.columnas` (esquema
+# viejo, sin `archivos`) deliberadamente como fixture de caso **INVÁLIDO**
+# (CA-08/M-02: esquema viejo sin `archivos` utilizable; CA-28/M-13: híbrido,
+# el segundo fixture embebido en el mismo test es el esquema viejo puro,
+# usado para probar la disyunción de mensajes). Cualquier otra aparición de
+# `contract_data.columnas` como raíz sería una migración incompleta (CA-25).
+_FUNCIONES_EXENTAS_ESQUEMA_VIEJO = frozenset(
+    {
+        "test_load_contract_esquema_viejo_m02",
+        "test_load_contract_hibrido_archivos_y_columnas_residual_m13",
+    }
+)
+
+
+def test_auditoria_migracion_sin_esquema_viejo() -> None:
+    """Caso 25 (TSK-46, CA-25): auditoría de migración -- el inventario de
+    `plan.md` ("Estrategia de migración de los tests") queda **en cero**:
+    ningún test de este archivo construye ni afirma `contract_data.columnas`
+    (la clave `columnas` en la **raíz** de `contract_data`, esquema viejo de
+    `config_contract`) como forma **válida**, salvo los dos fixtures
+    deliberadamente exentos que la usan como caso **inválido**
+    (`test_load_contract_esquema_viejo_m02`, CA-08/M-02;
+    `test_load_contract_hibrido_archivos_y_columnas_residual_m13`, CA-28/
+    M-13, cuyo segundo fixture embebido es también el esquema viejo puro).
+
+    Verifica además que la única ventana de aserción **relajada
+    temporalmente** que dejó abierta la migración de forma del Caso 1
+    (TSK-03: la igualdad exacta de `columnas: []` / M-07, relajada a
+    subcadena "pendiente de endurecer en el Caso 12") quedó **endurecida**
+    al texto literal M-07 exacto en
+    `test_load_contract_columnas_vacias_en_archivo_m07` (Caso 12): no debe
+    quedar ninguna aserción de subcadena para ese comportamiento.
+
+    Técnica de auditoría (inspección estática del propio archivo de tests
+    como texto, sin ejecutar pytest recursivamente dentro de un test): se
+    localiza cada aparición literal de la secuencia de dos líneas
+    `"contract_data:\\n"` seguida inmediatamente de `"  columnas:\\n"` (la
+    forma en que los fixtures crudos de este archivo construyen YAML línea a
+    línea) -- eso es exactamente `columnas` declarada como hija directa de
+    la raíz de `contract_data`, sin pasar por `archivos[]`. Se resuelve la
+    función `test_*` que envuelve cada aparición (la última `def test_`
+    anterior a su posición) y se exige que esté en el conjunto exento.
+    También se aplica el mismo escaneo a `conftest.py`, donde el helper
+    `write_contract_yaml` y las fixtures declarativas viven -- ninguna debe
+    construir el esquema viejo en absoluto (ni siquiera como caso inválido:
+    los fixtures inválidos se escriben con `texto=` crudo dentro de los
+    propios tests, no como fixtures reutilizables de `conftest.py`).
+
+    Nota sobre el mecanismo de fallo esperado si la migración estuviera
+    incompleta: un test que afirmara el esquema viejo como válido (p. ej.
+    construyendo `contract_data.columnas` fuera del conjunto exento, o sin
+    envolverlo en `pytest.raises(ContractSchemaError)`) haría que el
+    conteo de apariciones fuera de las funciones exentas fuera > 0, y este
+    test fallaría con un `AssertionError` señalando la función y la línea
+    exactas -- no un `ImportError` ni un error de colección.
+    """
+    ruta_tests = Path(__file__).resolve()
+    ruta_conftest = ruta_tests.parent / "conftest.py"
+
+    patron_esquema_viejo_raiz = re.compile(
+        r'"contract_data:\\n"\s*\n\s*"  columnas:\\n"'
+    )
+    patron_def_test = re.compile(r"^def (test_\w+)\(", re.MULTILINE)
+
+    def _apariciones_fuera_de_exentas(ruta: Path) -> list[str]:
+        codigo = ruta.read_text(encoding="utf-8")
+        definiciones = sorted(
+            (m.start(), m.group(1)) for m in patron_def_test.finditer(codigo)
+        )
+        fallos: list[str] = []
+        for match in patron_esquema_viejo_raiz.finditer(codigo):
+            posicion = match.start()
+            numero_linea = codigo.count("\n", 0, posicion) + 1
+            # Función envolvente: la última `def test_...` cuya posición
+            # antecede a la aparición encontrada.
+            nombre_funcion = None
+            for inicio_def, nombre in definiciones:
+                if inicio_def <= posicion:
+                    nombre_funcion = nombre
+                else:
+                    break
+            if nombre_funcion not in _FUNCIONES_EXENTAS_ESQUEMA_VIEJO:
+                fallos.append(
+                    f"{ruta.name}:{numero_linea} (función "
+                    f"{nombre_funcion!r}) construye 'contract_data.columnas' "
+                    f"en la raíz (esquema viejo) fuera de las funciones "
+                    f"exentas {sorted(_FUNCIONES_EXENTAS_ESQUEMA_VIEJO)!r}"
+                )
+        return fallos
+
+    fallos_tests = _apariciones_fuera_de_exentas(ruta_tests)
+    fallos_conftest = _apariciones_fuera_de_exentas(ruta_conftest)
+    assert not fallos_tests and not fallos_conftest, (
+        "inventario de migración (CA-25) NO está en cero, quedan usos del "
+        "esquema viejo como forma potencialmente válida: "
+        f"{fallos_tests + fallos_conftest}"
+    )
+
+    # Las DOS apariciones exentas deben existir realmente (si alguien borra
+    # los fixtures de CA-08/CA-28 sin querer, este test debe notarlo en vez
+    # de pasar en vacío por ausencia de coincidencias).
+    codigo_tests = ruta_tests.read_text(encoding="utf-8")
+    total_apariciones = len(patron_esquema_viejo_raiz.findall(codigo_tests))
+    assert total_apariciones == 2, (
+        "se esperaban exactamente 2 apariciones del esquema viejo en la "
+        "raíz (CA-08 y el fixture embebido de CA-28), se encontraron "
+        f"{total_apariciones}; revisar si un fixture inválido se perdió o "
+        "si apareció uno nuevo sin marcar como exento"
+    )
+
+    # Cada función exenta debe usar el esquema viejo como caso INVÁLIDO
+    # (envuelto en pytest.raises(ContractSchemaError)), nunca como valor de
+    # retorno esperado sin excepción.
+    for nombre_funcion in _FUNCIONES_EXENTAS_ESQUEMA_VIEJO:
+        patron_funcion = re.compile(
+            rf"^def {re.escape(nombre_funcion)}\(.*?(?=^def test_|\Z)",
+            re.MULTILINE | re.DOTALL,
+        )
+        cuerpo_match = patron_funcion.search(codigo_tests)
+        assert cuerpo_match is not None, (
+            f"no se encontró el cuerpo de la función exenta {nombre_funcion!r}"
+        )
+        assert "pytest.raises(ContractSchemaError)" in cuerpo_match.group(0), (
+            f"la función exenta {nombre_funcion!r} debe usar el esquema "
+            f"viejo únicamente dentro de pytest.raises(ContractSchemaError) "
+            f"(caso inválido, CA-08/CA-28), no como forma válida"
+        )
+
+    # La ventana de aserción relajada del Caso 1 (columnas: [] / M-07) debe
+    # estar endurecida al texto literal exacto, no a una subcadena.
+    assert (
+        'mensaje_esperado = (\n'
+        '        "archivo[1] \'ventas.csv\': la lista de columnas no puede '
+        'estar vacía"\n'
+        '    )\n'
+        '    assert str(exc_info.value) == mensaje_esperado'
+    ) in codigo_tests, (
+        "la aserción de M-07 (columnas: [] en un archivo, Caso 12) debe "
+        "estar endurecida a igualdad EXACTA del texto literal; el "
+        "inventario de migración del plan (CA-25) no puede quedar en cero "
+        "si esta ventana relajada sigue como subcadena pendiente de "
+        "endurecer"
+    )
