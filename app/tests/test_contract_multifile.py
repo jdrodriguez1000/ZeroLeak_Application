@@ -1798,3 +1798,42 @@ def test_load_contract_fail_fast_cardinalidad_agnostico_al_orden(
         f"el mensaje no debe concatenar M-05 y M-10 a la vez (eso sería "
         f"agregación, no fail-fast); mensaje observado: {mensaje!r}"
     )
+
+
+def test_contract_no_expone_columnas(
+    write_contract_yaml: Callable[..., Path],
+    archivos_dos_archivos: list[dict],
+) -> None:
+    """Caso 21 (TSK-41, CA-24): `Contract` **no** expone `columnas` -- ni
+    como campo del modelo (`'columnas' not in Contract.model_fields`) ni
+    como atributo accesible en una instancia (`AttributeError`). La única
+    vía para llegar a las columnas es `archivos[i].columnas` (D-25d, sin
+    atajo de compatibilidad hacia el esquema viejo de un solo archivo).
+
+    Candidato a **caracterización** (marcado `(car?)` en el plan, L-13/L-14):
+    desde el Caso 1 (TSK-05) `Contract.columnas` ya fue reemplazado por
+    `Contract.archivos: list[ArchivoContrato]` sin propiedad de
+    compatibilidad, así que se espera verde inmediato. Si es así, la
+    honestidad de este test se verifica por inyección/reversión temporal
+    (L-10): se inyecta temporalmente en `Contract`
+    (`app/src/zeroleak/config/contract.py`) una propiedad de compatibilidad
+    `columnas` (p. ej. `@property` que aplane `archivos`), se confirma que
+    el test pasa a FAILED, y se revierte de inmediato dejando `contract.py`
+    sin diff nuevo.
+    """
+    assert "columnas" not in Contract.model_fields, (
+        "Contract.model_fields no debe declarar 'columnas' (D-25d): la "
+        "única vía de acceso a las columnas es archivos[i].columnas; "
+        f"campos observados: {sorted(Contract.model_fields)!r}"
+    )
+
+    path = write_contract_yaml(archivos=archivos_dos_archivos)
+    contrato = load_contract(path)
+
+    with pytest.raises(AttributeError):
+        contrato.columnas
+
+    assert not hasattr(contrato, "columnas"), (
+        "Contract(...).columnas no debe existir como atributo accesible "
+        "(D-25d); hasattr reporta presencia inesperada del atributo"
+    )
