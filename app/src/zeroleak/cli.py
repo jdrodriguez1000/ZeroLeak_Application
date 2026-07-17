@@ -11,6 +11,7 @@ import os
 import sys
 from pathlib import Path
 
+from zeroleak.config import ContractParseError, ContractSchemaError, load_contract
 from zeroleak.core.scaffold import ClientNameError, TenantExistsError, create_client
 from zeroleak.ingest import IngestResult, TenantNotFoundError, ingest_paths
 
@@ -25,7 +26,8 @@ def _clients_root() -> Path:
 
 _USAGE = (
     "uso: zlk client new <NOMBRE_CLIENTE>\n"
-    "     zlk ingest <CLIENTE> <ruta>..."
+    "     zlk ingest <CLIENTE> <ruta>...\n"
+    "     zlk contract check <CLIENTE>"
 )
 
 
@@ -97,6 +99,36 @@ def _dispatch_ingest(client: str, paths: list[str]) -> int:
     return result.exit_code
 
 
+def _parse_contract_check_args(argv: list[str]) -> str | None:
+    """Extrae `<CLIENTE>` de `argv` si es una invocación válida de
+    `contract check`; retorna `None` si `argv` no corresponde a ese
+    subcomando. La longitud es exacta (CA-14): `contract check <C> extra`
+    no despacha.
+    """
+    if len(argv) == 3 and argv[0] == "contract" and argv[1] == "check":
+        return argv[2]
+    return None
+
+
+def _dispatch_contract_check(client: str) -> int:
+    """Ejecuta `contract check <client>`: resuelve la ruta del contrato con
+    `_clients_root()`, invoca `load_contract` (motor de `contract_multifile`,
+    sin modificarlo, CA-19) y traduce su veredicto al exit code
+    correspondiente (camino feliz, CA-01): éxito -> 0, con el mensaje
+    impreso por stdout.
+    """
+    clients_root = _clients_root()
+    contrato = clients_root / client / "input" / "contract_data.yaml"
+
+    contract = load_contract(contrato)
+    print(f"OK  contrato válido: {client} — {contrato}")
+    print(
+        f"    {len(contract.archivos)} archivo(s) declarado(s): "
+        + ", ".join(a.nombre for a in contract.archivos)
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Punto de entrada de la consola `zlk`.
 
@@ -114,6 +146,10 @@ def main(argv: list[str] | None = None) -> int:
     ingest_args = _parse_ingest_args(argv)
     if ingest_args is not None:
         return _dispatch_ingest(*ingest_args)
+
+    contract_check_client = _parse_contract_check_args(argv)
+    if contract_check_client is not None:
+        return _dispatch_contract_check(contract_check_client)
 
     print(_USAGE, file=sys.stderr)
     return 1

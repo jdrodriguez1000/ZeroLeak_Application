@@ -1636,13 +1636,17 @@ def test_load_contract_core_invocable_sin_cli(
     write_contract_yaml: Callable[..., Path],
     contrato_valido_columnas: list[dict],
 ) -> None:
-    """Destino final: Caso 22 (CA-27): `load_contract` es invocable
-    **directamente** como función Python (sin argv, subprocess ni fachada
-    CLI); su firma es `load_contract(path) -> Contract`; y **no** existe un
-    comando `zlk contract validate` en esta feature (core-only, D-23d;
-    TSK-03: forma migrada).
+    """Reinterpretación de CA-27 (gate del paso 5 de `contract_check`,
+    2026-07-17): el core sigue siendo invocable sin CLI; ahora además tiene
+    una. `load_contract` es invocable **directamente** como función Python
+    (sin argv, subprocess ni fachada CLI); su firma es
+    `load_contract(path) -> Contract`. La feature `contract_check` agrega
+    `zlk contract check <CLIENTE>` como fachada delgada sobre este mismo
+    core (D-23d deja de exigir core-only; CA-21 acota el retiro de las dos
+    aserciones de "sin fachada CLI" que este test tenía hasta entonces,
+    conservando las tres que siguen vigentes).
 
-    Cuatro verificaciones:
+    Tres verificaciones:
 
     1. **Invocación directa:** se llama `load_contract(path)` en proceso,
        reutilizando el fixture válido de camino feliz (envuelto en un único
@@ -1653,9 +1657,6 @@ def test_load_contract_core_invocable_sin_cli(
     3. **Firma — anotación de retorno:** `inspect.signature(load_contract)
        .return_annotation` es exactamente la clase `Contract` (no `Any`,
        no ausente, no una cadena/forward-ref sin resolver).
-    4. **Sin fachada CLI:** `zeroleak.cli` no registra ningún subcomando
-       `contract`, ni el texto de uso (`_USAGE`) menciona la palabra
-       "contract".
     """
     # (1) Invocación directa, sin argv/subprocess/CLI.
     path = write_contract_yaml(
@@ -1676,18 +1677,6 @@ def test_load_contract_core_invocable_sin_cli(
     assert firma.return_annotation is Contract, (
         f"load_contract debe anotar su retorno como 'Contract' exactamente; "
         f"anotación observada: {firma.return_annotation!r}"
-    )
-
-    # (3) Sin fachada CLI: ningún símbolo ni el texto de uso mencionan "contract".
-    simbolos_cli = dir(zeroleak_cli)
-    simbolos_contract = [s for s in simbolos_cli if "contract" in s.lower()]
-    assert simbolos_contract == [], (
-        f"zeroleak.cli no debe registrar ningún subcomando 'contract' "
-        f"(core-only, D-23d); símbolos encontrados: {simbolos_contract}"
-    )
-    assert "contract" not in zeroleak_cli._USAGE.lower(), (
-        "el texto de uso de zeroleak.cli no debe mencionar 'contract' "
-        "(no existe zlk contract validate, D-23d)"
     )
 
 

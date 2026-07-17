@@ -238,6 +238,110 @@ def archivos_seis_tipos(contrato_seis_tipos_columnas: list[dict]) -> list[dict]:
     return [{"nombre": "clientes.csv", "columnas": contrato_seis_tipos_columnas}]
 
 
+def _generar_texto_contract_yaml(archivos: list[dict]) -> str:
+    """Genera el texto YAML de un `contract_data.yaml` multi-archivo.
+
+    Mismo generador que usa `write_contract_yaml` (TSK-01 de
+    `contract_check`, feature `contract_check`): se replica aquí en vez de
+    reutilizar directamente esa fixture porque `tenant_con_contrato` escribe
+    bajo `<clients_root>/<nombre>/input/`, no en la raíz de `tmp_path`.
+    """
+    lineas = ["contract_data:", "  archivos:"]
+    for archivo in archivos:
+        lineas.append(f"    - nombre: {archivo['nombre']}")
+        lineas.append("      columnas:")
+        for col in archivo.get("columnas", []):
+            lineas.append(f"        - nombre: {col['nombre']}")
+            lineas.append(f"          tipo: {col['tipo']}")
+            lineas.append(f"          nulable: {str(col['nulable']).lower()}")
+            lineas.append(f"          llave: {str(col['llave']).lower()}")
+    return "\n".join(lineas) + "\n"
+
+
+@pytest.fixture
+def tenant_con_contrato(
+    clients_root: Path,
+) -> Callable[..., Path]:
+    """Factory de tenant con `input/contract_data.yaml` (TSK-01, `contract_check`).
+
+    Crea `<clients_root>/<nombre>/input/` y escribe ahí el
+    `contract_data.yaml`, ya sea con `texto=` crudo (para YAML roto, esquema
+    inválido o el scaffold sin cuerpo), o generado desde
+    `archivos=[{nombre, columnas}]` con el mismo generador que
+    `write_contract_yaml` (D-18: raíz `contract_data` -> `archivos[].columnas`).
+    Devuelve la ruta del tenant (no la del YAML). Todo bajo `tmp_path`
+    (vía `clients_root`), vocabulario sintético (`clientes.csv`, `ventas.csv`;
+    `cliente_id`, `correo`, `alta`, `venta_id`, `monto`), sin PII (C-01).
+    """
+
+    def _make(
+        nombre: str,
+        *,
+        texto: str | None = None,
+        archivos: list[dict] | None = None,
+    ) -> Path:
+        tenant_dir = clients_root / nombre
+        input_dir = tenant_dir / "input"
+        input_dir.mkdir(parents=True)
+        if texto is None:
+            texto = _generar_texto_contract_yaml(archivos or [])
+        (input_dir / "contract_data.yaml").write_text(texto, encoding="utf-8")
+        return tenant_dir
+
+    return _make
+
+
+@pytest.fixture
+def escenario_contract_check(
+    clients_root: Path,
+    tenant_con_contrato: Callable[..., Path],
+    archivos_dos_archivos: list[dict],
+) -> Dict[str, Path]:
+    """Escenario con los cinco tenants que `contract_check` necesita a la vez
+    (TSK-02): válido (2 archivos), scaffoldeado (`contract_data:` sin cuerpo,
+    texto exacto de `scaffold.py:_CONTRACT_DATA_YAML`), de esquema inválido,
+    de YAML roto y sin contrato; más, en el tenant válido, un
+    `data/bronze/clientes.csv` sintético y un `data/manifest.json`.
+
+    Devuelve un `dict` con `clients_root` y la ruta de cada tenant, sujeto de
+    las auditorías de solo-lectura (CA-16) y de frontera (CA-17).
+    """
+    valido = tenant_con_contrato("VALIDO", archivos=archivos_dos_archivos)
+    scaffoldeado = tenant_con_contrato(
+        "SCAFFOLDEADO",
+        texto="# contract_data.yaml — Contrato de Datos (completar).\ncontract_data:\n",
+    )
+    esquema_invalido = tenant_con_contrato(
+        "ESQUEMA_INVALIDO",
+        texto="contract_data:\n  archivos: \"no soy lista\"\n",
+    )
+    yaml_roto = tenant_con_contrato(
+        "YAML_ROTO",
+        texto="contract_data:\n  archivos: [\n",
+    )
+    sin_contrato_dir = clients_root / "SIN_CONTRATO"
+    sin_contrato_dir.mkdir(parents=True)
+
+    bronze_dir = valido / "data" / "bronze"
+    bronze_dir.mkdir(parents=True)
+    (bronze_dir / "clientes.csv").write_text(
+        "cliente_id,correo,alta\n1,a@b.test,2024-01-01\n", encoding="utf-8"
+    )
+    manifest_path = valido / "data" / "manifest.json"
+    manifest_path.write_text(
+        json.dumps({"version": 1, "files": []}, indent=2), encoding="utf-8"
+    )
+
+    return {
+        "clients_root": clients_root,
+        "valido": valido,
+        "scaffoldeado": scaffoldeado,
+        "esquema_invalido": esquema_invalido,
+        "yaml_roto": yaml_roto,
+        "sin_contrato": sin_contrato_dir,
+    }
+
+
 @pytest.fixture
 def read_manifest() -> Callable[[Path], dict]:
     """Helper de lectura del `manifest.json` de un tenant (TSK-01).
