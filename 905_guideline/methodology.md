@@ -29,11 +29,11 @@ Este documento no repite lo que ya tiene dueño canónico:
 
 | Tema | Fuente canónica |
 |---|---|
-| Principios (P1–P8), Estándares (E1–E12), Normas de Comportamiento (NC-1…NC-6) | **`905_guideline/principles.md`** |
+| Principios (P1–P8), Estándares (E1–E13), Normas de Comportamiento (NC-1…NC-6) | **`905_guideline/principles.md`** |
 | Plantillas de artefactos de feature (feature_contract, definition, notebook, spec, plan, verification, state) | **`600_template/`** |
 | Estado y avance del proyecto entre sesiones | **`900_persistence/`** |
 | Estrategia de ramas / PR y protocolos de sesión | **`CLAUDE.md`** + agentes `session-starter` / `session-closer` |
-| **Metodología de construcción** (este archivo): flujo notebook→SDD+TDD, gates, persistencia, evaluación, evolución, seguridad | **este documento** |
+| **Metodología de construcción** (este archivo): flujo notebook→SDD+TDD, gates, persistencia, evaluación, observabilidad de agentes, evolución, seguridad | **este documento** |
 
 > **Comportamiento vinculante.** Todo agente de desarrollo debe cumplir los P/E/NC de `principles.md`
 > como restricciones inmutables.
@@ -174,6 +174,56 @@ procesa la información:
 
 > Esta restricción es vinculante y se detalla en `constraints.md`. Todo agente y todo artefacto la
 > respetan; su cumplimiento se verifica en `verification.md`.
+
+---
+
+## 7. Observabilidad y Conformidad de los Agentes de Desarrollo (E13, P8)
+Esta sección operacionaliza **E13**. Mientras §4 evalúa **el producto** (el motor determinista), aquí se
+observa y audita **el comportamiento de los agentes de desarrollo** que lo construyen. Aplica a **todo
+subagente de desarrollo** (`feature_definer`, `notebook_writer`, `spec_writer`, `plan_builder`,
+`tdd_tester`, `tdd_coder`, `tdd_refactor`, `integration_tester`, `spec_verifier`).
+
+### 7.1 Traza automática por subagente
+Cada invocación de un subagente deja una traza propia en
+`…/<session_id>/subagents/agent-<id>.jsonl` (+ `.meta.json` con `agentType`, `description`, `toolUseId`).
+Contiene la **secuencia de herramientas, entradas/salidas, timestamps y costo (tokens)**. Es la fuente de
+verdad de *qué hizo* el agente; el reporte que devuelve a la sesión principal es narrativa y **no** cuenta
+como evidencia de comportamiento.
+
+> Estos JSONL son un detalle interno de la herramienta (formato no documentado, sujeto a limpieza
+> periódica). La observabilidad **durable** exige destilar la traza a un artefacto propio del repo (§7.2).
+
+### 7.2 Reporte de conformidad por invocación
+Cada invocación produce, de forma **automática**, un reporte de conformidad:
+- **Disparador:** hook `SubagentStop` filtrado por el nombre del agente (`matcher`); dispara justo cuando el
+  agente termina, antes de devolver control a la sesión principal.
+- **Lector:** un script localiza la traza del subagente (vía `session_id` + `agentType`), la destila y
+  ejecuta el check-set de conformidad.
+- **Salida durable:** el reporte (traza + checks `PASS/FAIL` con evidencia + costo) se escribe al repo, p. ej.
+  `610_features/<feature>/_trace/`.
+
+El **motor de traza/reporte se construye una sola vez** y es genérico; a cada agente se le añade su **perfil
+de conformidad** (§7.3).
+
+### 7.3 Check-set de conformidad (por agente)
+Los checks son **específicos por agente**, derivados de sus **Reglas Vinculantes**. Ejemplos:
+
+| Agente | Checks deterministas (ejemplos) |
+|---|---|
+| `feature_definer` | leyó `feature_contract.md` **antes** de escribir · **un solo** `Write`, a `definition.md` (Single Writer) · sigue la plantilla · `snake_case` · "qué, no cómo" (sin nombres de función/tipos/algoritmos) |
+| `tdd_tester` | el test se escribe **antes** del código · falla (RED) por la razón correcta |
+| `plan_builder` | cada `TSK-xx` traza a un `CA-xx` · sin tareas huérfanas |
+| `spec_writer` | cada `CA-xx` enlaza a una `HU-xx` · Single Writer sobre `spec.md` |
+
+### 7.4 Línea de corte: conformidad (determinista) vs. evaluación (juez)
+Son **dos disciplinas distintas y no corren en el mismo momento**:
+- **Conformidad determinista** (esta sección): **en vivo**, por cada invocación real, vía hook. Responde
+  *¿siguió el procedimiento?*. No requiere LLM.
+- **Evaluación con juez** (§4 + E3): **offline y por lotes**. Responde *¿el resultado es bueno?* (calidad
+  semántica de las salidas probabilísticas). Solo arranca cuando **(a)** la capa determinista es confiable y
+  **(b)** existe un dataset de fixtures (casos sintéticos, incl. **defectos sembrados**). Se corre **N veces**
+  por fixture y se mide **consistencia** (pass rate + varianza), no una sola pasada. Coherente con la
+  independencia del evaluador (P3) y la calibración con rúbrica 0.0–1.0 (E3).
 
 ---
 

@@ -6,6 +6,7 @@ system_design §5.
 from __future__ import annotations
 
 from zeroleak.config.contract import (
+    ArchivoContrato,
     Columna,
     Contract,
     ContractParseError,
@@ -17,6 +18,7 @@ from zeroleak.config.contract import (
 __all__ = [
     "load_contract",
     "Contract",
+    "ArchivoContrato",
     "Columna",
     "TipoDato",
     "ContractParseError",

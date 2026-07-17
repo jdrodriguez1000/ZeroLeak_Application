@@ -77,35 +77,45 @@ def ingestible_tenant(
 
 @pytest.fixture
 def write_contract_yaml(tmp_path: Path) -> Callable[..., Path]:
-    """Factory de `contract_data.yaml` sintético (TSK-01, feature `config_contract`).
+    """Factory de `contract_data.yaml` sintético (TSK-01, feature `contract_multifile`).
 
     Materializa un YAML de contrato en `tmp_path` (nunca bajo `clients/*/data/`,
-    C-01). Dos formas de uso:
+    C-01). Migrado a la forma **multi-archivo** (D-18/CA-01): el parámetro
+    `columnas=` del esquema viejo (`contract_data.columnas`, hoy inválido) se
+    **retira**; la única forma generada es `archivos=`. Dos formas de uso:
 
     - `write_contract_yaml(texto="...")`: escribe el texto YAML crudo tal cual
-      (útil para fixtures de esquema inválido o YAML sintácticamente roto).
-    - `write_contract_yaml(columnas=[{...}, ...])`: genera el YAML a partir de
-      una lista de columnas ficticias (`nombre`, `tipo`, `nulable`, `llave`),
-      bajo la raíz `contract_data` -> `columnas` (D-23a), preservando el orden
-      declarado.
+      (útil para fixtures de esquema inválido, híbrido o YAML sintácticamente
+      roto, que necesitan controlar la raíz byte a byte).
+    - `write_contract_yaml(archivos=[{"nombre": ..., "columnas": [...]}, ...])`:
+      genera el YAML a partir de una lista de archivos, cada uno con su
+      `nombre` y su lista de columnas ficticias (`nombre`, `tipo`, `nulable`,
+      `llave`), bajo la raíz `contract_data` -> `archivos[].columnas` (D-18),
+      preservando el orden declarado de archivos y de columnas dentro de cada
+      uno.
 
-    Columnas ficticias de referencia (matrices de mentiras del spike):
-    `test_id`, `correo`, `monto`, `fecha_alta`, `activo`. Sin PII real.
+    Vocabulario ficticio de referencia (matrices de mentiras, C-01):
+    `clientes.csv`/`ventas.csv`/`catalogo.csv`, columnas `cliente_id`,
+    `correo`, `venta_id`, `vendida_en`, `monto`, `fecha_alta`, `activo`,
+    `creado_en`, `sku`, `precio`. Sin PII real.
     """
 
     def _write(
         texto: str | None = None,
-        columnas: list[dict] | None = None,
+        archivos: list[dict] | None = None,
         filename: str = "contract_data.yaml",
     ) -> Path:
         if texto is None:
-            columnas = columnas or []
-            lineas = ["contract_data:", "  columnas:"]
-            for col in columnas:
-                lineas.append(f"    - nombre: {col['nombre']}")
-                lineas.append(f"      tipo: {col['tipo']}")
-                lineas.append(f"      nulable: {str(col['nulable']).lower()}")
-                lineas.append(f"      llave: {str(col['llave']).lower()}")
+            archivos = archivos or []
+            lineas = ["contract_data:", "  archivos:"]
+            for archivo in archivos:
+                lineas.append(f"    - nombre: {archivo['nombre']}")
+                lineas.append("      columnas:")
+                for col in archivo.get("columnas", []):
+                    lineas.append(f"        - nombre: {col['nombre']}")
+                    lineas.append(f"          tipo: {col['tipo']}")
+                    lineas.append(f"          nulable: {str(col['nulable']).lower()}")
+                    lineas.append(f"          llave: {str(col['llave']).lower()}")
             texto = "\n".join(lineas) + "\n"
         path = tmp_path / filename
         path.write_text(texto, encoding="utf-8")
@@ -146,6 +156,86 @@ def contrato_seis_tipos_columnas() -> list[dict]:
         {"nombre": "creado_en", "tipo": "datetime", "nulable": True, "llave": False},
         {"nombre": "activo", "tipo": "boolean", "nulable": False, "llave": False},
     ]
+
+
+@pytest.fixture
+def clientes_columnas() -> list[dict]:
+    """Columnas ficticias de `clientes.csv`: 3 columnas (TSK-02).
+
+    Incluye `cliente_id` (llave), que **también** aparece como columna de
+    `ventas_columnas` -- homónimo deliberado entre archivos distintos, legal
+    por diseño (CA-03, D-25 hallazgo 2).
+    """
+    return [
+        {"nombre": "cliente_id", "tipo": "integer", "nulable": False, "llave": True},
+        {"nombre": "correo", "tipo": "string", "nulable": True, "llave": False},
+        {"nombre": "fecha_alta", "tipo": "date", "nulable": True, "llave": False},
+    ]
+
+
+@pytest.fixture
+def ventas_columnas() -> list[dict]:
+    """Columnas ficticias de `ventas.csv`: 4 columnas (TSK-02).
+
+    Incluye `cliente_id` (homónimo con `clientes_columnas`, legal) y
+    `vendida_en` de tipo `datetime`.
+    """
+    return [
+        {"nombre": "venta_id", "tipo": "integer", "nulable": False, "llave": True},
+        {"nombre": "cliente_id", "tipo": "integer", "nulable": False, "llave": False},
+        {"nombre": "vendida_en", "tipo": "datetime", "nulable": False, "llave": False},
+        {"nombre": "monto", "tipo": "float", "nulable": True, "llave": False},
+    ]
+
+
+@pytest.fixture
+def catalogo_columnas() -> list[dict]:
+    """Columnas ficticias de `catalogo.csv`: 2 columnas (TSK-02).
+
+    Usadas por la variante de **tres** archivos (Caso 3b) y por los casos que
+    ejercitan N >= 3 sin cota superior (p. ej. Caso 17b, archivo del medio).
+    """
+    return [
+        {"nombre": "sku", "tipo": "string", "nulable": False, "llave": True},
+        {"nombre": "precio", "tipo": "float", "nulable": True, "llave": False},
+    ]
+
+
+@pytest.fixture
+def archivos_un_archivo(clientes_columnas: list[dict]) -> list[dict]:
+    """Variante de **un solo** archivo (TSK-02): caso general, len(archivos)==1 (CA-04)."""
+    return [{"nombre": "clientes.csv", "columnas": clientes_columnas}]
+
+
+@pytest.fixture
+def archivos_dos_archivos(
+    clientes_columnas: list[dict], ventas_columnas: list[dict]
+) -> list[dict]:
+    """Variante de **dos** archivos, en el orden declarado (TSK-02, CA-01)."""
+    return [
+        {"nombre": "clientes.csv", "columnas": clientes_columnas},
+        {"nombre": "ventas.csv", "columnas": ventas_columnas},
+    ]
+
+
+@pytest.fixture
+def archivos_tres_archivos(
+    clientes_columnas: list[dict],
+    ventas_columnas: list[dict],
+    catalogo_columnas: list[dict],
+) -> list[dict]:
+    """Variante de **tres** archivos, en el orden declarado (TSK-02, Caso 3b: CA-01/CA-04)."""
+    return [
+        {"nombre": "clientes.csv", "columnas": clientes_columnas},
+        {"nombre": "ventas.csv", "columnas": ventas_columnas},
+        {"nombre": "catalogo.csv", "columnas": catalogo_columnas},
+    ]
+
+
+@pytest.fixture
+def archivos_seis_tipos(contrato_seis_tipos_columnas: list[dict]) -> list[dict]:
+    """Variante de un archivo con los 6 `TipoDato` (TSK-02, CA-05)."""
+    return [{"nombre": "clientes.csv", "columnas": contrato_seis_tipos_columnas}]
 
 
 @pytest.fixture
