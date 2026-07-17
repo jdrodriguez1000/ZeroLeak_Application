@@ -1,7 +1,7 @@
 {
   "feature": "contract_multifile",
   "status": "in_progress",
-  "current_stage": "tdd",
+  "current_stage": "merge_to_main",
   "stages": {
     "feature_contract": {
       "status": "done",
@@ -505,7 +505,8 @@
       ]
     },
     "integration_tester": {
-      "status": "pending"
+      "status": "not_applicable",
+      "desc": "Paso 11 NO APLICA por D-23d (feature core-only): el plan (paso 8) no genero ninguna tarea de integracion (0 TSK de integration_tester sobre 50). La feature no cruza la frontera D-21 (no lee datos bajo bronze/, CA-23 lo blinda con espia de open + guarda de no-vacuidad L-17) ni expone fachada CLI (CA-27 fija load_contract(path) -> Contract como unica superficie), por lo que no hay piezas separadas que ensamblar en un e2e. Marcado not_applicable al cierre atendiendo la observacion O-1 de spec_verifier (paso 12, verification.md), que lo declaro explicitamente 'no es hueco de conformidad'. El veredicto CONFORME se emitio con la suite completa en verde (111 passed / 0 failed) sin depender de esta etapa."
     },
     "spec_verifier": {
       "status": "done",
@@ -514,8 +515,11 @@
       "desc": "Paso 12 (spec_verifier, contexto fresco): veredicto CONFORME. Suite ejecutada por el verificador (py -3.13 -m pytest app/tests -q): 111 passed / 0 failed; corrida de la feature (test_contract_multifile.py -v): 42 passed / 0 failed. Los 28 CA-xx quedan 'cubierto' con evidencia REAL ejecutada (0 parcial, 0 no cubierto): cada CA se trazo a test(s) identificables y todos los que dependen de un mensaje congelado M-xx lo fijan por igualdad EXACTA (assert str(exc)==...), verificado por lectura de las aserciones y por coincidencia caracter a caracter de las constantes _MENSAJE_*/_PLANTILLA_* de contract.py con la spec. Alcance auditado: frontera D-21 blindada por CA-23 (espia de open con guarda de no-vacuidad L-17, exactamente 1 apertura del propio YAML, nada bajo bronze/clients/.csv); C-01 auditada por CA-26 (fixtures sinteticos, listas blancas, ninguno bajo clients/*/data/); core-only D-23d por CA-27 (firma load_contract(path)->Contract sin estilo, sin fachada CLI); sin atajo Contract.columnas por CA-24; plantilla 600_template/contract_data.yaml reescrita al esquema archivos[] verificada por CA-22. Sin hallazgos bloqueantes. Observaciones informativas: (O-1) integration_tester figura 'pending' en state.json pero D-23d/core-only establece que no aplican tareas de integracion -- no es hueco de conformidad, se recomienda marcarlo not_applicable al cierre; (O-2) breaking de Contract.columnas ya aceptado en el gate del plan (paso 9), con 2 scripts obsoletos de config_contract a limpiar (T-69), fuera de alcance de esta verificacion. Sin etapa de retorno: procede el paso 13 (abrir PR) -> gate humano (human_test + merge_to_main, C-03)."
     },
     "human_test": {
-      "status": "pending",
-      "gate": "human"
+      "status": "done",
+      "gate": "human",
+      "awaiting_approval": false,
+      "approved": true,
+      "desc": "Paso 13 (gate humano) EJECUTADO Y APROBADO el 2026-07-17 por el humano, con las dos verificaciones de human_test.md corridas en su maquina y su salida observada en la sesion (no reportada por un agente): (1) `py -3.13 -m pytest app/tests -q` -> 111 passed in 4.07s / 0 failed, coincidiendo exactamente con el baseline que fijo spec_verifier en el paso 12; (2) `py -3.13 610_features/contract_multifile/pruebas_humanas.py` -> RESULTADO: 15/15 pruebas OK, con las 15 pruebas P1..P15 en [OK] y los mensajes M-01..M-13 verificados por igualdad exacta contra la spec en las salidas impresas. Cobertura observada del script: camino feliz multi-archivo (P1, CA-01/02), 6 tipos del enum (P2, CA-05), columna homonima entre archivos (P3, CA-03, duplicado por archivo y no global), T-56 raiz nula -> M-01 (P4, CA-19), esquema viejo -> M-02 (P5, CA-08), hibrido -> M-13 (P6, CA-28, la unica regla sin prototipar en el spike), archivos vacia -> M-04 (P7, CA-06), archivos no-lista -> M-03 (P8, CA-09), archivo sin nombre -> M-06 (P9, CA-10), archivo duplicado -> M-05 (P10, CA-13), columna sin tipo -> M-09 (P11, CA-15), tipo invalido -> M-10 (P12, CA-16), columna duplicada -> M-11 (P13, CA-17), YAML roto -> M-12 (P14, CA-18) y la plantilla real 600_template/contract_data.yaml (P15, CA-22, T-58). Sin hallazgos ni defectos nuevos; el gate no levanto ningun punto de decision. Procede merge_to_main (paso 13: PR escrito por el agente, aprobacion y merge por el humano, C-03)."
     },
     "merge_to_main": {
       "status": "pending",
