@@ -31,6 +31,7 @@ import pytest
 
 import zeroleak.cli as zeroleak_cli
 from zeroleak.cli import main
+from zeroleak.config import ContractSchemaError, load_contract
 
 
 @pytest.fixture(autouse=True)
@@ -291,3 +292,45 @@ def test_contract_check_precondiciones_no_invocan_el_motor(
             f"muerto; llamadas registradas: {doble.call_count}"
         )
         doble.assert_called_once_with(ruta_contrato)
+
+
+def test_contract_check_schema_verbatim_exit_4(
+    clients_root: Path,
+    tenant_con_contrato: Callable[..., Path],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Caso 6 / TSK-14 (CA-03): propiedad verbatim (esquema).
+
+    Para un tenant cuyo `contract_data.yaml` viola el esquema (`archivos: []`,
+    M-04), se compara el **mismo archivo** por dos caminos: `str(exc)`
+    capturado invocando `load_contract(ruta)` **directo**, y el `stderr` del
+    comando `main(["contract","check",C])`. La propiedad exigida es la
+    igualdad exacta `stderr.strip() == str(exc)` -- ni prefijo, ni sufijo, ni
+    reformato de la fachada (variante A, resolución del gate del paso 5) --
+    además de `stdout == ""` y exit code `4`.
+    """
+    texto_yaml = "contract_data:\n  archivos: []\n"
+    tenant_con_contrato("PANADERIA_ESQUEMA_INVALIDO", texto=texto_yaml)
+    ruta = clients_root / "PANADERIA_ESQUEMA_INVALIDO" / "input" / "contract_data.yaml"
+    assert ruta.is_file()
+
+    with pytest.raises(ContractSchemaError) as excinfo:
+        load_contract(ruta)
+    mensaje_motor = str(excinfo.value)
+
+    exit_code = main(["contract", "check", "PANADERIA_ESQUEMA_INVALIDO"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 4, (
+        f"YAML que viola el esquema debe retornar exit 4; obtenido: "
+        f"{exit_code!r}; stderr: {captured.err!r}"
+    )
+    assert captured.out == "", (
+        f"contract check en fallo de esquema debe dejar stdout vacío; "
+        f"obtenido: {captured.out!r}"
+    )
+    assert captured.err.strip() == mensaje_motor, (
+        "stderr del comando debe ser IGUAL, sin ninguna alteración, al "
+        "mensaje que produce load_contract invocado directamente sobre el "
+        f"mismo archivo;\nmotor: {mensaje_motor!r}\ncomando: {captured.err!r}"
+    )

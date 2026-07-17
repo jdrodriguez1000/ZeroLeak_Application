@@ -138,7 +138,11 @@ def _dispatch_contract_check(client: str) -> int:
         )
         return 2
 
-    contract = load_contract(contrato)
+    try:
+        contract = load_contract(contrato)
+    except ContractSchemaError as exc:
+        print(str(exc), file=sys.stderr)
+        return 4
     print(f"OK  contrato válido: {client} — {contrato}")
     print(
         f"    {len(contract.archivos)} archivo(s) declarado(s): "
