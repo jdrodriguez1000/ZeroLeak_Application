@@ -1,7 +1,9 @@
 {
   "feature": "contract_multifile",
-  "status": "in_progress",
-  "current_stage": "merge_to_main",
+  "status": "done",
+  "current_stage": "closed",
+  "closed_at": "2026-07-17",
+  "closed_desc": "Tracer Bullet contract_multifile CERRADO: 13/13 pasos. Veredicto spec_verifier CONFORME (28/28 CA con evidencia ejecutada), gate humano 15/15 OK, PR #4 mergeado (181238d) y suite verificada post-merge sobre main (111 passed / 0 failed). Paso 11 (integration_tester) not_applicable por D-23d core-only. Deuda abierta: T-69 (2 scripts obsoletos de config_contract rotos por el breaking D-25d, aceptado en el gate del paso 9).",
   "stages": {
     "feature_contract": {
       "status": "done",
@@ -522,8 +524,15 @@
       "desc": "Paso 13 (gate humano) EJECUTADO Y APROBADO el 2026-07-17 por el humano, con las dos verificaciones de human_test.md corridas en su maquina y su salida observada en la sesion (no reportada por un agente): (1) `py -3.13 -m pytest app/tests -q` -> 111 passed in 4.07s / 0 failed, coincidiendo exactamente con el baseline que fijo spec_verifier en el paso 12; (2) `py -3.13 610_features/contract_multifile/pruebas_humanas.py` -> RESULTADO: 15/15 pruebas OK, con las 15 pruebas P1..P15 en [OK] y los mensajes M-01..M-13 verificados por igualdad exacta contra la spec en las salidas impresas. Cobertura observada del script: camino feliz multi-archivo (P1, CA-01/02), 6 tipos del enum (P2, CA-05), columna homonima entre archivos (P3, CA-03, duplicado por archivo y no global), T-56 raiz nula -> M-01 (P4, CA-19), esquema viejo -> M-02 (P5, CA-08), hibrido -> M-13 (P6, CA-28, la unica regla sin prototipar en el spike), archivos vacia -> M-04 (P7, CA-06), archivos no-lista -> M-03 (P8, CA-09), archivo sin nombre -> M-06 (P9, CA-10), archivo duplicado -> M-05 (P10, CA-13), columna sin tipo -> M-09 (P11, CA-15), tipo invalido -> M-10 (P12, CA-16), columna duplicada -> M-11 (P13, CA-17), YAML roto -> M-12 (P14, CA-18) y la plantilla real 600_template/contract_data.yaml (P15, CA-22, T-58). Sin hallazgos ni defectos nuevos; el gate no levanto ningun punto de decision. Procede merge_to_main (paso 13: PR escrito por el agente, aprobacion y merge por el humano, C-03)."
     },
     "merge_to_main": {
-      "status": "pending",
-      "gate": "human"
+      "status": "done",
+      "gate": "human",
+      "awaiting_approval": false,
+      "approved": true,
+      "pr": 4,
+      "pr_url": "https://github.com/jdrodriguez1000/ZeroLeak_Application/pull/4",
+      "merge_commit": "181238d2b0af8bb899e28d05d0ff5173005174db",
+      "merged_at": "2026-07-17T11:44:34Z",
+      "desc": "Paso 13 (merge a main) COMPLETADO el 2026-07-17. PR #4 (feature/contract_multifile -> main) escrito por el agente; aprobacion y merge ejecutados por el humano, respetando C-03 (el agente nunca mergea por su cuenta). Merge commit 181238d. Verificacion POST-MERGE ejecutada sobre main ya actualizado (no sobre la rama): git pull --ff-only 853cc32..181238d (21 archivos, +8195/-819) y `py -3.13 -m pytest app/tests -q` -> 111 passed / 0 failed, mismo baseline que fijaron spec_verifier (paso 12) y el gate humano (paso 13). Integrado en main: core reescrito (app/src/zeroleak/config/contract.py, +ArchivoContrato exportado en config/__init__.py), suite migrada (test_config_contract.py -> test_contract_multifile.py; git la registro como delete+create y no como rename por el volumen de cambio), plantilla 600_template/contract_data.yaml en esquema archivos[] (T-58), los 9 artefactos del flujo de la feature y la persistencia. Con este merge el Tracer Bullet contract_multifile queda CERRADO en sus 13 pasos (quinto Tracer Bullet completo del proyecto). Deuda conocida y aceptada que sobrevive al cierre: T-69 -- el breaking de Contract.columnas (D-25d) deja efectivamente rotos en main los 2 scripts de verificacion humana de la feature ya cerrada config_contract (610_features/config_contract/pruebas_humanas.py y cargar_contrato.py), que siguen consumiendo Contract.columnas; no afectan la suite ni codigo productivo (son scripts de validacion humana cuyo proposito ya se cumplio), fueron aceptados a conciencia en el gate del paso 9 y quedan para revision/archivado en T-69."
     }
   }
 }
