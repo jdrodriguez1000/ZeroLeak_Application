@@ -48,8 +48,16 @@ Condiciones que deben cumplirse para considerar la feature **terminada** (compor
 - **Fachada delgada, como las dos que ya existen:** el CLI despacha y traduce excepciones de dominio a exit codes;
   **no** tiene lógica de negocio propia (el mismo criterio de `client_scaffold`, CA-02/CA-03, y de `ingest`,
   CA-12).
-- **Sin regresiones:** la suite completa queda en verde. Los 111 tests vigentes siguen pasando; en particular, esta
-  feature **no toca** `test_contract_multifile.py`.
+- **Sin regresiones, con una excepción declarada y aprobada:** la suite completa queda en verde. Los 111 tests
+  vigentes siguen pasando **salvo dos aserciones** de `test_load_contract_core_invocable_sin_cli`
+  (`test_contract_multifile.py:1635`), que esta feature rompe **por diseño**.
+  > **Corrección del paso 5 (gate humano).** La versión original de este contrato afirmaba que la feature "no toca
+  > `test_contract_multifile.py`". **Era falso**, y el spike lo destapó: ese test materializa CA-27/D-23d y
+  > assertea la **ausencia** de fachada CLI — `simbolos_contract == []` y `"contract" not in _USAGE.lower()` —,
+  > exactamente lo que el humano derogó en el paso 1. **Resolución del gate:** se **retiran esas dos aserciones**
+  > y se **conservan las tres** restantes (invocación directa, parámetro `path`, anotación de retorno `Contract`),
+  > que son el contenido real de CA-27 —*el core es invocable sin CLI*— y siguen siendo ciertas. CA-27 se
+  > **reinterpreta, no se abandona**: el core no necesita la CLI; ahora además la tiene.
 - **Seguro por diseño (C-01):** se desarrolla y prueba **exclusivamente** contra tenants y YAMLs **sintéticos** en
   `tmp_path`. El contrato describe **estructura**, no PII; `input/` es material versionable (§7), no datos reales
   del cliente. El comando **no lee ningún CSV** ni toca `data/`.
@@ -110,7 +118,16 @@ Condiciones que deben cumplirse para considerar la feature **terminada** (compor
 9. El comando **no lee ningún CSV** ni ninguna ruta fuera del `contract_data.yaml` del tenant (frontera D-21, con
    guarda de no-vacuidad al estilo L-17: el espía debe demostrar que observó algo).
 10. `app/src/zeroleak/config/contract.py` queda **byte a byte idéntico** al de `main` al cerrar la feature.
-11. La suite completa queda **en verde y sin regresiones** (111 passed vigentes + los tests nuevos).
+11. La suite completa queda **en verde** (111 passed vigentes + los tests nuevos), con la **única** modificación
+    declarada y aprobada en el gate del paso 5: el retiro de las dos aserciones de "no existe fachada CLI" en
+    `test_load_contract_core_invocable_sin_cli`. Ninguna otra cobertura vigente se reduce.
+12. **Distinción parse/schema (resuelto en el gate del paso 5 — variante A):** el mensaje del motor sale por
+    stderr **intacto** y las dos fallas se distinguen por **exit code**. Es la única variante que preserva el
+    criterio 2: con prefijo, `stderr` dejaría de ser igual **por igualdad exacta** al mensaje del motor y el test
+    tendría que aflojarse a `startswith`. La spec fija los valores; el spike prototipó parse=3, schema=4.
+13. **Precondición (resuelto en el gate del paso 5):** tenant inexistente y tenant sin `input/contract_data.yaml`
+    comparten **un solo exit code (2)** —el mismo que `ingest` ya usa para `TenantNotFoundError`— y se distinguen
+    por **mensaje**, no por código.
 
 ## Dependencias
 - Feature **`config_contract` (T-43, en `main` vía PR #3)** y **`contract_multifile` (T-57, en `main` vía PR #4)**:
