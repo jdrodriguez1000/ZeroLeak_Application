@@ -1,7 +1,9 @@
 {
   "feature": "config_contract",
-  "status": "in_progress",
-  "current_stage": "tdd",
+  "status": "done",
+  "current_stage": "closed",
+  "closed_at": "2026-07-15",
+  "closed_desc": "Tracer Bullet config_contract CERRADO. PR #3 mergeado el 2026-07-15 (merge commit 853cc32eb26d6acd22614e052867c6b6b13fe7c4), veredicto spec_verifier CONFORME (15/15 CA, 88 passed). NOTA DE REGISTRO (corregida el 2026-07-17, T-79): este state.json quedo desactualizado en su momento -- conservaba status=in_progress / current_stage=tdd con tdd, human_test y merge_to_main sin cerrar, pese a que la feature ya estaba mergeada hacia 2 dias; la inconsistencia se detecto al abrir el archivo para ejecutar T-69 y se corrigio contra evidencia verificable (gh pr view 3 -> state MERGED, mergedAt 2026-07-15T11:31:47Z, mergeCommit 853cc32). La causa raiz (el cierre actualizo progress.md/tasks.md pero no el state.json de la feature) quedo registrada como L-26. Ver la nota de cada etapa para el alcance exacto de lo verificado y lo inferido.",
   "stages": {
     "feature_contract": {
       "status": "done",
@@ -34,7 +36,8 @@
       "approved": true
     },
     "tdd": {
-      "status": "in_progress",
+      "status": "done",
+      "desc_cierre": "Registro corregido el 2026-07-17 (T-79). Figuraba 'in_progress' por el cierre incompleto del state.json, no porque el bucle siguiera abierto: los 15 casos constan cerrados uno por uno (13 'refactored' + 2 'characterized', ninguno abierto) y el spec_verifier emitio CONFORME sobre los 15 CA con la suite ejecutada (88 passed / 0 failed), lo que seria imposible con el bucle a medias. Correccion de registro unicamente: no se toco ningun caso ni codigo.",
       "cases": [
         { "id": 1, "status": "refactored", "ca": ["CA-01"], "tsk": ["TSK-01", "TSK-02", "TSK-03"], "desc": "REFACTORED: pulido de estilo/documentacion sobre el camino feliz de TSK-03 (sin cambios de comportamiento). Se agrego referencia explicita a CA-01/CA-02 en los docstrings de Contract y Columna, y un comentario aclaratorio sobre la clave raiz contract_data/columnas en load_contract. Se confirmo honestamente que el codigo del Caso 1 es minimo (solo camino feliz) y no hay duplicacion ni abstracciones de manejo de errores que extraer todavia (eso corresponde a TSK-28 tras consolidar el core); no se adelanto ningun helper especulativo de parseo/esquema/duplicados. Suite completa: 70 passed, sin regresiones. Siguiente: tdd_tester avanza al Caso 2." },
         { "id": 2, "status": "characterized", "ca": ["CA-02"], "tsk": ["TSK-04", "TSK-05"], "desc": "CHARACTERIZED: test_load_contract_fidelidad_de_campos (CA-02) escrito y ejecutado PASA de inmediato contra el codigo del Caso 1 (TSK-03): Columna, al ser un modelo Pydantic con los 4 campos declarados 1:1 sin coercion adicional, ya mapea nombre/tipo/nulable/llave fielmente como efecto colateral del diseño. Verificacion honesta: se inyecto temporalmente un defecto (field_validator que forzaba nulable=True) en contract.py, se confirmo que el test FALLA correctamente detectando la discrepancia (assert True is False), y se revirtio el cambio sin dejar rastro (git diff limpio). El test se mantiene como test de caracterizacion/regresion para CA-02. GREEN (paso 10, tdd_coder): confirmado por inspeccion de config/contract.py (Columna: nombre/tipo/nulable/llave, 1:1, sin coercion) que TSK-03 ya satisface CA-02; TSK-05 marcada cancelada_suspendida en plan.md (sin entregable de codigo nuevo, patron ingest Casos 3/8/9). Suite completa: 71 passed, sin regresiones. Siguiente: tdd_tester avanza al Caso 3 (TSK-06/07, CA-03)." },
@@ -64,14 +67,31 @@
       "desc": "Paso 12 (spec_verifier, contexto fresco): veredicto CONFORME. Suite ejecutada y leida por el verificador: py -3.13 -m pytest tests -q -> 88 passed (19 de config_contract + 69 preexistentes, cero regresiones). Los 15 CA (CA-01..CA-15) quedan CUBIERTOS con evidencia verificada: cada CA tiene >=1 test identificable no tautologico; los 8 tests de caracterizacion (CA-02/03/05/10/12/13/14/15) se confirmaron como blindaje legitimo (no vacios). Verificacion adicional: el verificador invoco load_contract directamente y leyo las excepciones reales de CA-04/CA-06/CA-14 (CA-06 enumera los 6 tipos permitidos + valor invalido + indice; CA-14 emite una unica linea sin agregacion multi-error de Pydantic). Alcance auditado OK: frontera D-21 (CA-12, espia de open, no toca data/bronze), core-only D-23d (CA-13, sin CLI), enum cerrado 6 tipos D-23b (CA-03), fail-fast D-23c (CA-14), duplicados por cadena exacta D-23e (CA-09/CA-10). Cobertura HU->CA completa (HU-01..HU-08). Constraint C-01 (Datos en Boveda) cumplida (fixtures sinteticos en tmp_path, nunca bajo clients/*/data/, blindado por CA-15). Sin hallazgos bloqueantes. Observaciones menores no bloqueantes: (1) TSK-28 (refactor integral) sin ejecutar -- pulido opcional, calidad ya atendida con refactors por-caso, suite verde; (2) CA-14 verifica cardinalidad, no descarte activo de 2do error (anticipado en gate paso 9); (3) CA-15 sin detector generico de PII (limitacion conocida, cubierta con lista blanca). Etapa de retorno: no aplica. Listo para paso 13 (PR -> gate humano human_test + merge_to_main, C-03)."
     },
     "human_test": {
-      "status": "pending",
+      "status": "done",
       "gate": "human",
+      "approved": true,
+      "awaiting_approval": false,
       "desc": "Listo para que el HUMANO ejecute las pruebas: seguir 610_features/config_contract/human_test.md (Prueba 0: 'py -3.13 -m pytest app/tests -q' -> 88 passed; Prueba 1: 'py -3.13 610_features/config_contract/pruebas_humanas.py' -> 7/7 OK). Ambas ya ejecutadas con exito por el agente antes de este cierre. Tras aprobar, el humano mergea el PR feature/config_contract->main (no el agente).",
-      "artifacts": ["human_test.md", "pruebas_humanas.py"]
+      "desc_cierre": "Registro corregido el 2026-07-17 (T-79). Se marca 'done' por INFERENCIA a partir de un hecho verificable: el humano aprobo y mergeo el PR #3, y por C-03 el merge es acto exclusivo del humano, luego el gate se dio necesariamente por satisfecho. LIMITE DE HONESTIDAD: la sesion que corrigio este archivo NO presencio la ejecucion del gate y no inventa su detalle (fecha exacta, salida observada, hallazgos). Notese que la 'desc' original conservada arriba solo acredita que el AGENTE habia corrido las pruebas antes del cierre -- no es evidencia de que el humano las corriera. Contrastar con el gate de contract_multifile (2026-07-17), donde si consta la salida observada en sesion.",
+      "artifacts": ["human_test.md", "pruebas_humanas.py"],
+      "scripts_retirados": {
+        "tarea": "T-69",
+        "fecha": "2026-07-17",
+        "archivos": ["610_features/config_contract/pruebas_humanas.py", "610_features/config_contract/cargar_contrato.py"],
+        "desc": "T-69 EJECUTADA (decision del humano: borrar, no migrar): los 2 scripts de verificacion humana de esta feature se RETIRARON del arbol de trabajo con git rm. Motivo: el breaking de Contract.columnas (D-25d, feature contract_multifile, PR #4 mergeado el 2026-07-17) los dejo obsoletos, y su proposito -- que un humano validara config_contract en su gate -- ya se cumplio. Rotura CONFIRMADA POR EJECUCION antes de borrar, no por inspeccion: 'py -3.13 cargar_contrato.py 600_template/contract_data.yaml' -> AttributeError: 'Contract' object has no attribute 'columnas' (linea 81); 'py -3.13 pruebas_humanas.py' -> 1/8 OK, con las 7 fallas devolviendo el mensaje M-02 ('el contrato usa el esquema anterior de un solo archivo...') porque sus YAML sinteticos declaran columnas en la raiz -- es decir, no fallaban por un bug sino porque el motor nuevo los rechaza correctamente por obsoletos. El breaking estaba aceptado a conciencia desde el gate del paso 9 de contract_multifile (grep .columnas en todo el repo). La historia completa de ambos scripts se conserva en git (ultimo commit con ellos vivos: 986fc1e). NO se tocaron los artefactos historicos de esta feature (notebook, spec.md, plan.md, human_test.md, verification.md siguen citando .columnas): son el registro de lo que se decidio y verifico entonces, y reescribirlos falsificaria la historia -- por eso human_test.md sigue instruyendo correr un script que ya no existe, y esta nota es el puente. NOTA sobre T-68 (hueco de retroalimentacion del humano sobre su contract_data.yaml): cargar_contrato.py era precisamente una herramienta de ese tipo (recibe la ruta de un YAML del humano y muestra que entendio el motor). Retirarlo no agrava T-68 -- ya estaba roto e inservible -- pero si T-68 se construye algun dia, recuperar este script de git es un punto de partida razonable, migrando su tabla a archivos[].columnas."
+      }
     },
     "merge_to_main": {
-      "status": "pending",
-      "gate": "human"
+      "status": "done",
+      "gate": "human",
+      "approved": true,
+      "awaiting_approval": false,
+      "pr": 3,
+      "pr_url": "https://github.com/jdrodriguez1000/ZeroLeak_Application/pull/3",
+      "pr_title": "config_contract: leer y validar contract_data.yaml (Tracer Bullet 3)",
+      "merge_commit": "853cc32eb26d6acd22614e052867c6b6b13fe7c4",
+      "merged_at": "2026-07-15T11:31:47Z",
+      "desc": "Registro corregido el 2026-07-17 (T-79) contra evidencia verificable: gh pr view 3 -> state=MERGED, mergedAt=2026-07-15T11:31:47Z, mergeCommit=853cc32. El PR #3 lo escribio el agente; aprobacion y merge los ejecuto el humano (C-03). Este campo figuraba 'pending' por un cierre incompleto del state.json en su sesion, no porque el merge faltara."
     }
   }
 }
