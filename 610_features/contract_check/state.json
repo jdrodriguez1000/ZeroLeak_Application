@@ -1,0 +1,17 @@
+{
+  "feature": "contract_check",
+  "status": "in_progress",
+  "current_stage": "feature_definer",
+  "stages": {
+    "feature_contract":   { "status": "done", "artifact": "feature_contract.md", "owner": "main_session", "desc": "Paso 2 del flujo (2026-07-17). Feature = T-68 opcion (a): fachada CLI `zlk contract check <CLIENTE>` sobre el motor `load_contract` ya construido y verificado. Decidido en el paso 1 por el humano: mecanismo = CLI propia (descartadas (b) doblar en `zlk ingest` y (c) aceptar senal tardia); entrada = nombre de cliente (resuelve `<clients_root>/<CLIENTE>/input/contract_data.yaml`). Supera deliberadamente D-23d/CA-27 (core-only): se AGREGA fachada, el core sigue invocable sin CLI. El core (`config/contract.py`) NO se modifica: los mensajes M-01..M-13 se muestran sin reescribir. Hueco identificado a cubrir en la fachada: `load_contract` no captura `FileNotFoundError` (contract.py:213). Pendiente al cierre: registrar la decision en `decisions.md`." },
+    "feature_definer":    { "status": "pending", "artifact": "definition.md" },
+    "notebook_writer":    { "status": "pending", "artifact": "contract_check.ipynb", "gate": "human", "awaiting_approval": false },
+    "spec_writer":        { "status": "pending", "artifact": "spec.md",  "gate": "human", "awaiting_approval": false },
+    "plan_builder":       { "status": "pending", "artifact": "plan.md",  "gate": "human", "awaiting_approval": false },
+    "tdd":                { "status": "pending", "cases": [] },
+    "integration_tester": { "status": "pending" },
+    "spec_verifier":      { "status": "pending", "artifact": "verification.md" },
+    "human_test":         { "status": "pending", "gate": "human" },
+    "merge_to_main":      { "status": "pending", "gate": "human" }
+  }
+}
