@@ -98,6 +98,44 @@ def test_contract_check_stdout_f01_exacto_dos_archivos(
     )
 
 
+def test_contract_check_tenant_inexistente_exit_2_stderr_f02(
+    clients_root: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Caso 3 / TSK-08 (CA-08): `<CLIENTE>` que no existe bajo `clients_root`
+    (deliberadamente NO se crea ningún tenant `FANTASMA`) -> `main(["contract",
+    "check", C])` retorna exactamente `2`, deja stdout vacío y stderr es
+    **exactamente** F-02: `Tenant inexistente o incompleto: 'FANTASMA'`
+    (`{client!r}`). Además, stderr no debe contener `Traceback` ni
+    `FileNotFoundError`: el motor (`load_contract`, `contract.py:213`) hace
+    `open(path)` sin capturar `FileNotFoundError`, así que si la fachada
+    invocara el motor sin comprobar antes la precondición del tenant, este
+    test capturaría el traceback sin controlar en vez del mensaje F-02.
+    """
+    assert not (clients_root / "FANTASMA").exists()
+
+    exit_code = main(["contract", "check", "FANTASMA"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2, (
+        f"tenant inexistente debe retornar exit 2; obtenido: {exit_code!r}; "
+        f"stderr: {captured.err!r}"
+    )
+    assert captured.out == "", (
+        f"tenant inexistente debe dejar stdout vacío; obtenido: {captured.out!r}"
+    )
+    assert captured.err == "Tenant inexistente o incompleto: 'FANTASMA'\n", (
+        f"stderr debe ser exactamente F-02; obtenido: {captured.err!r}"
+    )
+    assert "Traceback" not in captured.err, (
+        f"stderr no debe contener un traceback sin controlar; obtenido: {captured.err!r}"
+    )
+    assert "FileNotFoundError" not in captured.err, (
+        f"stderr no debe filtrar el nombre de la excepción del motor; "
+        f"obtenido: {captured.err!r}"
+    )
+
+
 def test_contract_check_stdout_f01_exacto_un_archivo(
     clients_root: Path,
     tenant_con_contrato: Callable[..., Path],

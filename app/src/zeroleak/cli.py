@@ -115,10 +115,18 @@ def _dispatch_contract_check(client: str) -> int:
     `_clients_root()`, invoca `load_contract` (motor de `contract_multifile`,
     sin modificarlo, CA-19) y traduce su veredicto al exit code
     correspondiente (camino feliz, CA-01): éxito -> 0, con el mensaje
-    impreso por stdout.
+    impreso por stdout. Precondición 1 (CA-08): si `clients_root/<client>`
+    no es un directorio, no se invoca el motor (que no captura
+    `FileNotFoundError`, `contract.py:213`); se traduce a F-02 por stderr
+    y `return 2`.
     """
     clients_root = _clients_root()
-    contrato = clients_root / client / "input" / "contract_data.yaml"
+    tenant_dir = clients_root / client
+    contrato = tenant_dir / "input" / "contract_data.yaml"
+
+    if not tenant_dir.is_dir():
+        print(f"Tenant inexistente o incompleto: {client!r}", file=sys.stderr)
+        return 2
 
     contract = load_contract(contrato)
     print(f"OK  contrato válido: {client} — {contrato}")
