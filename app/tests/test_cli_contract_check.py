@@ -65,3 +65,62 @@ def test_contract_check_contrato_valido_dos_archivos_exit_0(
     assert captured.err == "", (
         f"contract check en éxito debe dejar stderr vacío; obtenido: {captured.err!r}"
     )
+
+
+def test_contract_check_stdout_f01_exacto_dos_archivos(
+    clients_root: Path,
+    tenant_con_contrato: Callable[..., Path],
+    archivos_dos_archivos: list[dict],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Caso 2 / TSK-06 (CA-02): con un contrato válido de 2 archivos, stdout
+    es **exactamente** F-01: línea 1 `OK  contrato válido: <C> — <ruta>`
+    (dos espacios tras `OK`, guion largo U+2014 rodeado de espacios,
+    `<ruta> == str(clients_root/<C>/input/contract_data.yaml)`), línea 2
+    `    2 archivo(s) declarado(s): clientes.csv, ventas.csv` (4 espacios de
+    indentación, recuento y nombres en el orden declarado). Igualdad exacta
+    contra el texto completo, no subcadena.
+    """
+    tenant_con_contrato("PANADERIA", archivos=archivos_dos_archivos)
+    ruta = clients_root / "PANADERIA" / "input" / "contract_data.yaml"
+
+    exit_code = main(["contract", "check", "PANADERIA"])
+
+    captured = capsys.readouterr()
+    esperado = (
+        "OK  contrato válido: PANADERIA — " + str(ruta) + "\n"
+        "    2 archivo(s) declarado(s): clientes.csv, ventas.csv\n"
+    )
+    assert exit_code == 0
+    assert captured.out == esperado, (
+        f"stdout de contract check debe ser exactamente F-01;\n"
+        f"esperado: {esperado!r}\nobtenido: {captured.out!r}"
+    )
+
+
+def test_contract_check_stdout_f01_exacto_un_archivo(
+    clients_root: Path,
+    tenant_con_contrato: Callable[..., Path],
+    archivos_un_archivo: list[dict],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Caso 2 / TSK-06 (CA-02), variante de **un solo** archivo: la segunda
+    línea de F-01 usa singular numérico correcto en la redacción congelada
+    (`1 archivo(s) declarado(s): <nombre>` -- la forma `archivo(s)` no
+    cambia con el número, solo cambia el recuento y el listado de nombres).
+    """
+    tenant_con_contrato("PANADERIA", archivos=archivos_un_archivo)
+    ruta = clients_root / "PANADERIA" / "input" / "contract_data.yaml"
+
+    exit_code = main(["contract", "check", "PANADERIA"])
+
+    captured = capsys.readouterr()
+    esperado = (
+        "OK  contrato válido: PANADERIA — " + str(ruta) + "\n"
+        "    1 archivo(s) declarado(s): clientes.csv\n"
+    )
+    assert exit_code == 0
+    assert captured.out == esperado, (
+        f"stdout de contract check (1 archivo) debe ser exactamente F-01;\n"
+        f"esperado: {esperado!r}\nobtenido: {captured.out!r}"
+    )
