@@ -32,6 +32,7 @@ import pytest
 import zeroleak.cli as zeroleak_cli
 from zeroleak.cli import main
 from zeroleak.config import ContractSchemaError, load_contract
+from zeroleak.config.contract import _MENSAJE_COLUMNAS_VACIA
 
 
 @pytest.fixture(autouse=True)
@@ -333,4 +334,57 @@ def test_contract_check_schema_verbatim_exit_4(
         "stderr del comando debe ser IGUAL, sin ninguna alteración, al "
         "mensaje que produce load_contract invocado directamente sobre el "
         f"mismo archivo;\nmotor: {mensaje_motor!r}\ncomando: {captured.err!r}"
+    )
+
+
+def test_contract_check_m07_exacto_por_la_fachada(
+    tenant_con_contrato: Callable[..., Path],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Caso 7 / TSK-16 (CA-04): mensaje concreto (esquema), M-07.
+
+    `archivos[1]` (`ventas.csv`) declara `columnas: []` (lista vacía
+    explícita, no ausente): el motor rechaza esto con M-07
+    (`_columnas_no_vacias`, `contract.py`), localizado como
+    `archivo[1] 'ventas.csv'` (D-25a). El stderr del comando debe ser
+    **exactamente** ese texto compuesto -- comparado por **igualdad exacta
+    contra la constante congelada `_MENSAJE_COLUMNAS_VACIA`** importada del
+    motor (`zeroleak.config.contract`), nunca recopiada como literal en este
+    archivo (sección "Dependencias y Contratos" del plan): si el motor
+    cambiara el texto de M-07, la regresión aparecería ahí, no aquí.
+
+    Es también la prueba de que la fachada **no tiene rama especial** para
+    este error: lo traduce con la misma rama `except ContractSchemaError`
+    genérica que ya cubre el Caso 6 (CA-03).
+    """
+    texto_yaml = (
+        "contract_data:\n"
+        "  archivos:\n"
+        "    - nombre: clientes.csv\n"
+        "      columnas:\n"
+        "        - nombre: cliente_id\n"
+        "          tipo: integer\n"
+        "          nulable: false\n"
+        "          llave: true\n"
+        "    - nombre: ventas.csv\n"
+        "      columnas: []\n"
+    )
+    tenant_con_contrato("PANADERIA_M07", texto=texto_yaml)
+
+    exit_code = main(["contract", "check", "PANADERIA_M07"])
+
+    captured = capsys.readouterr()
+    esperado = f"archivo[1] 'ventas.csv': {_MENSAJE_COLUMNAS_VACIA}"
+    assert exit_code == 4, (
+        f"columnas vacías en archivos[1] debe retornar exit 4; obtenido: "
+        f"{exit_code!r}; stderr: {captured.err!r}"
+    )
+    assert captured.out == "", (
+        f"contract check en fallo de esquema debe dejar stdout vacío; "
+        f"obtenido: {captured.out!r}"
+    )
+    assert captured.err.strip() == esperado, (
+        "stderr debe ser exactamente M-07 (igualdad exacta contra la "
+        f"constante del motor);\nesperado: {esperado!r}\n"
+        f"obtenido: {captured.err!r}"
     )
