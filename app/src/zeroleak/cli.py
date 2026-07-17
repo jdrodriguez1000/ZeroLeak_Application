@@ -140,6 +140,9 @@ def _dispatch_contract_check(client: str) -> int:
 
     try:
         contract = load_contract(contrato)
+    except ContractParseError as exc:
+        print(str(exc), file=sys.stderr)
+        return 3
     except ContractSchemaError as exc:
         print(str(exc), file=sys.stderr)
         return 4

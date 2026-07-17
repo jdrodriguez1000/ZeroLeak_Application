@@ -31,7 +31,7 @@ import pytest
 
 import zeroleak.cli as zeroleak_cli
 from zeroleak.cli import main
-from zeroleak.config import ContractSchemaError, load_contract
+from zeroleak.config import ContractParseError, ContractSchemaError, load_contract
 from zeroleak.config.contract import _MENSAJE_COLUMNAS_VACIA
 
 
@@ -387,4 +387,54 @@ def test_contract_check_m07_exacto_por_la_fachada(
         "stderr debe ser exactamente M-07 (igualdad exacta contra la "
         f"constante del motor);\nesperado: {esperado!r}\n"
         f"obtenido: {captured.err!r}"
+    )
+
+
+def test_contract_check_parse_verbatim_exit_3(
+    clients_root: Path,
+    tenant_con_contrato: Callable[..., Path],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Caso 8 / TSK-17 (CA-05): propiedad verbatim (parseo), M-12.
+
+    Para un tenant cuyo `contract_data.yaml` es **sintácticamente inválido**
+    (el parser YAML no puede ni cargarlo -- distinto del Caso 6, que sí
+    parsea pero viola el esquema), se compara el **mismo archivo** por dos
+    caminos: `str(exc)` capturado invocando `load_contract(ruta)` **directo**
+    (debe ser un `ContractParseError`, no un `ContractSchemaError` -- se
+    verifica explícitamente para no confundir este caso con el Caso 6), y el
+    `stderr` del comando `main(["contract","check",C])`. La propiedad
+    exigida es la igualdad exacta `stderr.strip() == str(exc)` -- ni prefijo,
+    ni sufijo, ni reformato de la fachada (variante A, resolución del gate
+    del paso 5) -- además de `stdout == ""` y exit code `3` (no `4`).
+    """
+    texto_yaml = (
+        "contract_data:\n"
+        "  archivos:\n"
+        "    - nombre: clientes.csv\n"
+        "      columnas: [nombre: cliente_id, tipo: integer\n"
+    )
+    tenant_con_contrato("PANADERIA_YAML_ROTO", texto=texto_yaml)
+    ruta = clients_root / "PANADERIA_YAML_ROTO" / "input" / "contract_data.yaml"
+    assert ruta.is_file()
+
+    with pytest.raises(ContractParseError) as excinfo:
+        load_contract(ruta)
+    mensaje_motor = str(excinfo.value)
+
+    exit_code = main(["contract", "check", "PANADERIA_YAML_ROTO"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 3, (
+        f"YAML sintácticamente roto debe retornar exit 3; obtenido: "
+        f"{exit_code!r}; stderr: {captured.err!r}"
+    )
+    assert captured.out == "", (
+        f"contract check en fallo de parseo debe dejar stdout vacío; "
+        f"obtenido: {captured.out!r}"
+    )
+    assert captured.err.strip() == mensaje_motor, (
+        "stderr del comando debe ser IGUAL, sin ninguna alteración, al "
+        "mensaje que produce load_contract invocado directamente sobre el "
+        f"mismo archivo;\nmotor: {mensaje_motor!r}\ncomando: {captured.err!r}"
     )
