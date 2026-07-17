@@ -25,9 +25,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Callable
+from unittest import mock
 
 import pytest
 
+import zeroleak.cli as zeroleak_cli
 from zeroleak.cli import main
 
 
@@ -234,3 +236,58 @@ def test_contract_check_stdout_f01_exacto_un_archivo(
         f"stdout de contract check (1 archivo) debe ser exactamente F-01;\n"
         f"esperado: {esperado!r}\nobtenido: {captured.out!r}"
     )
+
+
+def test_contract_check_precondiciones_no_invocan_el_motor(
+    clients_root: Path,
+    tenant_con_contrato: Callable[..., Path],
+    archivos_dos_archivos: list[dict],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Caso 5 / TSK-12 (CA-10): parcheando `load_contract` en el namespace de
+    `zeroleak.cli` con un doble que registra sus llamadas, invocar el comando
+    sobre (a) un tenant inexistente y (b) un tenant sin contrato deja el
+    doble con **0 llamadas** en ambos casos, y ambas invocaciones retornan
+    `2` sin propagar excepción: la fachada nunca llega a tocar el motor
+    cuando una precondición falla.
+
+    Guarda de no-vacuidad (L-17): el mismo doble, sobre un tenant **con**
+    contrato, registra **exactamente 1** llamada con la ruta del YAML — si
+    el parche estuviera mal instalado (p. ej. importado por valor en vez de
+    por nombre en el módulo `cli`), esta última aserción fallaría también en
+    el caso de éxito, delatando un doble mudo.
+    """
+    tenant_con_contrato("PANADERIA_CON_CONTRATO", archivos=archivos_dos_archivos)
+    ruta_contrato = (
+        clients_root / "PANADERIA_CON_CONTRATO" / "input" / "contract_data.yaml"
+    )
+    tenant_sin_contrato = clients_root / "SIN_CONTRATO_CASO5"
+    tenant_sin_contrato.mkdir(parents=True)
+
+    with mock.patch.object(
+        zeroleak_cli, "load_contract", wraps=zeroleak_cli.load_contract
+    ) as doble:
+        exit_code_inexistente = main(["contract", "check", "FANTASMA_CASO5"])
+        assert exit_code_inexistente == 2
+        assert doble.call_count == 0, (
+            "load_contract no debe invocarse cuando el tenant no existe "
+            f"(precondición 1); llamadas registradas: {doble.call_count}"
+        )
+
+        exit_code_sin_contrato = main(["contract", "check", "SIN_CONTRATO_CASO5"])
+        assert exit_code_sin_contrato == 2
+        assert doble.call_count == 0, (
+            "load_contract no debe invocarse cuando el tenant no tiene "
+            f"contrato (precondición 2); llamadas registradas: {doble.call_count}"
+        )
+
+        # Guarda de no-vacuidad (L-17): el doble sí se usa cuando el
+        # contrato existe -- si no, "0 llamadas" arriba no probaría nada.
+        exit_code_valido = main(["contract", "check", "PANADERIA_CON_CONTRATO"])
+        assert exit_code_valido == 0
+        assert doble.call_count == 1, (
+            "guarda de no-vacuidad: el doble debe registrar exactamente 1 "
+            "llamada cuando el contrato sí existe, o el instrumento está "
+            f"muerto; llamadas registradas: {doble.call_count}"
+        )
+        doble.assert_called_once_with(ruta_contrato)
