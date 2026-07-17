@@ -118,7 +118,10 @@ def _dispatch_contract_check(client: str) -> int:
     impreso por stdout. Precondición 1 (CA-08): si `clients_root/<client>`
     no es un directorio, no se invoca el motor (que no captura
     `FileNotFoundError`, `contract.py:213`); se traduce a F-02 por stderr
-    y `return 2`.
+    y `return 2`. Precondición 2 (CA-09): si el tenant existe pero el YAML
+    no es un archivo, tampoco se invoca el motor; se traduce a F-03 por
+    stderr y `return 2` (mismo código que la precondición 1, mensaje
+    distinto).
     """
     clients_root = _clients_root()
     tenant_dir = clients_root / client
@@ -126,6 +129,13 @@ def _dispatch_contract_check(client: str) -> int:
 
     if not tenant_dir.is_dir():
         print(f"Tenant inexistente o incompleto: {client!r}", file=sys.stderr)
+        return 2
+
+    if not contrato.is_file():
+        print(
+            f"El tenant {client!r} no tiene contrato: falta {contrato}",
+            file=sys.stderr,
+        )
         return 2
 
     contract = load_contract(contrato)

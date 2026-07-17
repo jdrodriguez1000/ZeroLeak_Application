@@ -136,6 +136,78 @@ def test_contract_check_tenant_inexistente_exit_2_stderr_f02(
     )
 
 
+def test_contract_check_tenant_sin_contrato_exit_2_stderr_f03(
+    clients_root: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Caso 4 / TSK-10 (CA-09): `<CLIENTE>` que existe como directorio bajo
+    `clients_root` pero **sin** `input/contract_data.yaml` -> `main(["contract",
+    "check", C])` retorna exactamente `2` (el **mismo** código que el Caso 3,
+    tenant inexistente) y stderr es **exactamente** F-03:
+    `El tenant 'SIN_CONTRATO' no tiene contrato: falta <ruta>` (con la ruta
+    resuelta del YAML ausente). stderr no debe contener `Traceback` ni
+    `FileNotFoundError`: el motor (`load_contract`, `contract.py:213`) hace
+    `open(path)` sin capturar `FileNotFoundError`, así que si la fachada
+    invocara el motor sin comprobar antes la precondición del contrato, este
+    test capturaría el traceback sin controlar en vez del mensaje F-03.
+    """
+    tenant_dir = clients_root / "SIN_CONTRATO"
+    tenant_dir.mkdir(parents=True)
+    ruta = tenant_dir / "input" / "contract_data.yaml"
+    assert tenant_dir.is_dir()
+    assert not ruta.exists()
+
+    exit_code = main(["contract", "check", "SIN_CONTRATO"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2, (
+        f"tenant sin contrato debe retornar exit 2 (mismo código que el "
+        f"tenant inexistente); obtenido: {exit_code!r}; stderr: {captured.err!r}"
+    )
+    assert captured.out == "", (
+        f"tenant sin contrato debe dejar stdout vacío; obtenido: {captured.out!r}"
+    )
+    esperado = f"El tenant 'SIN_CONTRATO' no tiene contrato: falta {ruta}\n"
+    assert captured.err == esperado, (
+        f"stderr debe ser exactamente F-03; esperado: {esperado!r}; "
+        f"obtenido: {captured.err!r}"
+    )
+    assert "Traceback" not in captured.err, (
+        f"stderr no debe contener un traceback sin controlar; obtenido: {captured.err!r}"
+    )
+    assert "FileNotFoundError" not in captured.err, (
+        f"stderr no debe filtrar el nombre de la excepción del motor; "
+        f"obtenido: {captured.err!r}"
+    )
+
+
+def test_contract_check_f02_distinto_de_f03(
+    clients_root: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Caso 4 / TSK-10 (CA-09): mismo exit code `2` para las dos
+    precondiciones (tenant ausente y contrato ausente), pero los mensajes de
+    stderr son **distintos entre sí** (F-02 != F-03): el código no basta
+    para distinguirlos, hay que mirar el texto.
+    """
+    tenant_sin_contrato = clients_root / "SIN_CONTRATO_2"
+    tenant_sin_contrato.mkdir(parents=True)
+
+    exit_code_inexistente = main(["contract", "check", "FANTASMA_2"])
+    stderr_inexistente = capsys.readouterr().err
+
+    exit_code_sin_contrato = main(["contract", "check", "SIN_CONTRATO_2"])
+    stderr_sin_contrato = capsys.readouterr().err
+
+    assert exit_code_inexistente == 2
+    assert exit_code_sin_contrato == 2
+    assert stderr_inexistente != stderr_sin_contrato, (
+        "F-02 (tenant inexistente) y F-03 (contrato ausente) deben ser "
+        f"mensajes distintos aunque compartan exit code 2; "
+        f"F-02={stderr_inexistente!r}; F-03={stderr_sin_contrato!r}"
+    )
+
+
 def test_contract_check_stdout_f01_exacto_un_archivo(
     clients_root: Path,
     tenant_con_contrato: Callable[..., Path],
